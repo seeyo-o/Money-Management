@@ -13,6 +13,31 @@ export interface AuthUser {
   displayName?: string | null;
 }
 
+export interface PasswordStrength {
+  hasMinLength: boolean;
+  hasUppercase: boolean;
+  hasNumber: boolean;
+  hasSymbol: boolean;
+  isValid: boolean;
+  score: number; // 0 to 4
+}
+
+export function validatePasswordStrength(pass: string): PasswordStrength {
+  const hasMinLength = pass.length >= 6;
+  const hasUppercase = /[A-Z]/.test(pass);
+  const hasNumber = /[0-9]/.test(pass);
+  const hasSymbol = /[^A-Za-z0-9]/.test(pass);
+  const score = [hasMinLength, hasUppercase, hasNumber, hasSymbol].filter(Boolean).length;
+  return {
+    hasMinLength,
+    hasUppercase,
+    hasNumber,
+    hasSymbol,
+    score,
+    isValid: hasMinLength && hasUppercase && hasNumber && hasSymbol,
+  };
+}
+
 export function translateAuthError(errorCode: string): string {
   switch (errorCode) {
     case 'auth/invalid-email':
@@ -69,6 +94,17 @@ export async function loginUser(email: string, pass: string): Promise<AuthUser> 
 }
 
 export async function registerUser(email: string, pass: string): Promise<AuthUser> {
+  if (!email || !pass) {
+    throw new Error('Email dan kata sandi wajib diisi.');
+  }
+
+  const strength = validatePasswordStrength(pass);
+  if (!strength.isValid) {
+    throw new Error(
+      'Kata sandi wajib minimal 6 karakter, mengandung huruf besar (A-Z), angka (0-9), dan simbol (!@#$...).'
+    );
+  }
+
   if (isFirebaseConfigured && auth) {
     try {
       const res = await createUserWithEmailAndPassword(auth, email, pass);
@@ -83,12 +119,6 @@ export async function registerUser(email: string, pass: string): Promise<AuthUse
     }
   } else {
     // Graceful Local Mock Auth
-    if (!email || !pass) {
-      throw new Error('Email dan kata sandi wajib diisi.');
-    }
-    if (pass.length < 6) {
-      throw new Error('Kata sandi minimal 6 karakter.');
-    }
     const mockUser: AuthUser = {
       uid: `user-${btoa(email).replace(/=/g, '')}`,
       email,

@@ -1,12 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Sparkles, ArrowRight, Lock, Mail, AlertCircle, ShieldCheck } from 'lucide-react';
+import {
+  Sparkles,
+  ArrowRight,
+  Lock,
+  Mail,
+  AlertCircle,
+  ShieldCheck,
+  Eye,
+  EyeOff,
+  Check,
+  X,
+  ShieldAlert,
+} from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { validatePasswordStrength } from '../../services/authService';
 
 export const AuthPage: React.FC = () => {
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -17,9 +31,22 @@ export const AuthPage: React.FC = () => {
   // @ts-expect-error router state from
   const from = location.state?.from?.pathname || '/dashboard';
 
+  // Real-time password strength validation
+  const pwdStrength = useMemo(() => {
+    return validatePasswordStrength(password);
+  }, [password]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (isRegister && !pwdStrength.isValid) {
+      setError(
+        'Kata sandi belum memenuhi standar keamanan: minimal 6 karakter, huruf besar (A-Z), angka (0-9), dan simbol.'
+      );
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -37,16 +64,18 @@ export const AuthPage: React.FC = () => {
   };
 
   const handleQuickDemo = async () => {
-    setEmail('demo.user@rasio.id');
-    setPassword('demo123456');
+    const demoEmail = 'demo.user@rasio.id';
+    const demoPassword = 'Demo@123456'; // Strong password compliant
+    setEmail(demoEmail);
+    setPassword(demoPassword);
     setLoading(true);
     try {
-      await login('demo.user@rasio.id', 'demo123456');
+      await login(demoEmail, demoPassword);
       navigate(from, { replace: true });
     } catch {
       // If user doesn't exist, register
       try {
-        await register('demo.user@rasio.id', 'demo123456');
+        await register(demoEmail, demoPassword);
         navigate(from, { replace: true });
       } catch (err: unknown) {
         setError((err as Error).message);
@@ -71,14 +100,14 @@ export const AuthPage: React.FC = () => {
         </div>
 
         {/* Card */}
-        <div className="bento-card p-6 sm:p-8 bg-white shadow-modal">
+        <div className="bento-card p-6 sm:p-8 bg-white shadow-modal rounded-2xl border border-slate-200">
           <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
             <div>
               <h2 className="text-base font-bold text-slate-900">
                 {isRegister ? 'Buat Akun Baru' : 'Selamat Datang'}
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                {isRegister ? 'Mulai kelola dompet dengan rasional' : 'Masuk untuk mengakses pembukuan'}
+                {isRegister ? 'Proteksi akun dengan kata sandi kuat' : 'Masuk untuk mengakses pembukuan'}
               </p>
             </div>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-50 text-teal-800 border border-teal-200 flex items-center gap-1">
@@ -95,6 +124,7 @@ export const AuthPage: React.FC = () => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Email Field */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 Alamat Email
@@ -112,6 +142,7 @@ export const AuthPage: React.FC = () => {
               </div>
             </div>
 
+            {/* Password Field */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 Kata Sandi (Password)
@@ -119,20 +150,126 @@ export const AuthPage: React.FC = () => {
               <div className="relative">
                 <Lock size={15} className="absolute left-3.5 top-3 text-slate-400" />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Minimal 6 karakter"
+                  placeholder={isRegister ? 'Kombinasi huruf besar, angka, simbol' : 'Masukkan password'}
                   required
-                  className="w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-teal-700 focus:bg-white transition"
+                  className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-teal-700 focus:bg-white transition"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-2.5 p-1 text-slate-400 hover:text-slate-600 rounded-lg transition"
+                  title={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+                >
+                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
               </div>
             </div>
 
+            {/* Interactive Password Strength Checklist (Only for Registration) */}
+            {isRegister && (
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2.5 text-xs">
+                {/* Strength Meter Bar */}
+                <div>
+                  <div className="flex items-center justify-between text-[11px] mb-1">
+                    <span className="font-semibold text-slate-600">Kekuatan Kata Sandi:</span>
+                    <span
+                      className={`font-bold ${
+                        pwdStrength.score === 4
+                          ? 'text-emerald-600'
+                          : pwdStrength.score === 3
+                          ? 'text-indigo-600'
+                          : pwdStrength.score === 2
+                          ? 'text-amber-600'
+                          : 'text-rose-600'
+                      }`}
+                    >
+                      {pwdStrength.score === 4
+                        ? 'Sangat Kuat'
+                        : pwdStrength.score === 3
+                        ? 'Cukup Kuat'
+                        : pwdStrength.score === 2
+                        ? 'Sedang'
+                        : password.length > 0
+                        ? 'Lemah'
+                        : 'Belum Diisi'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-1.5 h-1.5">
+                    {[1, 2, 3, 4].map((step) => (
+                      <div
+                        key={step}
+                        className={`rounded-full transition-all duration-300 ${
+                          pwdStrength.score >= step
+                            ? pwdStrength.score === 4
+                              ? 'bg-emerald-500'
+                              : pwdStrength.score === 3
+                              ? 'bg-indigo-500'
+                              : pwdStrength.score === 2
+                              ? 'bg-amber-500'
+                              : 'bg-rose-500'
+                            : 'bg-slate-200'
+                        }`}
+                      ></div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 4 Security Requirements Checklist */}
+                <div className="grid grid-cols-2 gap-2 pt-1 text-[11px]">
+                  <div className="flex items-center gap-1.5">
+                    {pwdStrength.hasMinLength ? (
+                      <Check size={13} className="text-emerald-600 shrink-0 font-bold" />
+                    ) : (
+                      <X size={13} className="text-slate-400 shrink-0" />
+                    )}
+                    <span className={pwdStrength.hasMinLength ? 'text-slate-800 font-semibold' : 'text-slate-400'}>
+                      Min. 6 karakter
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {pwdStrength.hasUppercase ? (
+                      <Check size={13} className="text-emerald-600 shrink-0 font-bold" />
+                    ) : (
+                      <X size={13} className="text-slate-400 shrink-0" />
+                    )}
+                    <span className={pwdStrength.hasUppercase ? 'text-slate-800 font-semibold' : 'text-slate-400'}>
+                      Huruf besar (A-Z)
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {pwdStrength.hasNumber ? (
+                      <Check size={13} className="text-emerald-600 shrink-0 font-bold" />
+                    ) : (
+                      <X size={13} className="text-slate-400 shrink-0" />
+                    )}
+                    <span className={pwdStrength.hasNumber ? 'text-slate-800 font-semibold' : 'text-slate-400'}>
+                      Angka (0-9)
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {pwdStrength.hasSymbol ? (
+                      <Check size={13} className="text-emerald-600 shrink-0 font-bold" />
+                    ) : (
+                      <X size={13} className="text-slate-400 shrink-0" />
+                    )}
+                    <span className={pwdStrength.hasSymbol ? 'text-slate-800 font-semibold' : 'text-slate-400'}>
+                      Simbol (!@#$...)
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <button
               type="submit"
-              disabled={loading}
-              className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-sm flex items-center justify-center gap-2 transition active:scale-95 disabled:opacity-50"
+              disabled={loading || (isRegister && !pwdStrength.isValid)}
+              className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-sm flex items-center justify-center gap-2 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span>{loading ? 'Memproses...' : isRegister ? 'Daftar Akun Baru' : 'Masuk ke Aplikasi'}</span>
               <ArrowRight size={14} className="text-teal-400" />
