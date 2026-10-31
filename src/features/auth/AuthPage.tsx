@@ -11,6 +11,8 @@ import {
   EyeOff,
   Check,
   X,
+  CheckCircle2,
+  XCircle,
   ShieldAlert,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -42,7 +44,7 @@ export const AuthPage: React.FC = () => {
 
     if (isRegister && !pwdStrength.isValid) {
       setError(
-        'Kata sandi belum memenuhi standar keamanan: minimal 6 karakter, huruf besar (A-Z), angka (0-9), dan simbol.'
+        'Kata sandi belum memenuhi standar keamanan: minimal 6 karakter, huruf besar (A-Z), huruf kecil (a-z), angka (0-9), dan simbol.'
       );
       return;
     }
@@ -177,37 +179,37 @@ export const AuthPage: React.FC = () => {
                     <span className="font-semibold text-slate-600">Kekuatan Kata Sandi:</span>
                     <span
                       className={`font-bold ${
-                        pwdStrength.score === 4
+                        pwdStrength.score === 5
                           ? 'text-emerald-600'
-                          : pwdStrength.score === 3
+                          : pwdStrength.score === 4
                           ? 'text-indigo-600'
-                          : pwdStrength.score === 2
+                          : pwdStrength.score === 3
                           ? 'text-amber-600'
                           : 'text-rose-600'
                       }`}
                     >
-                      {pwdStrength.score === 4
-                        ? 'Sangat Kuat'
+                      {pwdStrength.score === 5
+                        ? 'Sangat Kuat (5/5 Sempurna)'
+                        : pwdStrength.score === 4
+                        ? 'Kuat (4/5)'
                         : pwdStrength.score === 3
-                        ? 'Cukup Kuat'
-                        : pwdStrength.score === 2
-                        ? 'Sedang'
+                        ? 'Sedang (3/5)'
                         : password.length > 0
-                        ? 'Lemah'
+                        ? `Lemah (${pwdStrength.score}/5)`
                         : 'Belum Diisi'}
                     </span>
                   </div>
-                  <div className="grid grid-cols-4 gap-1.5 h-1.5">
-                    {[1, 2, 3, 4].map((step) => (
+                  <div className="grid grid-cols-5 gap-1.5 h-1.5">
+                    {[1, 2, 3, 4, 5].map((step) => (
                       <div
                         key={step}
                         className={`rounded-full transition-all duration-300 ${
                           pwdStrength.score >= step
-                            ? pwdStrength.score === 4
+                            ? pwdStrength.score === 5
                               ? 'bg-emerald-500'
-                              : pwdStrength.score === 3
+                              : pwdStrength.score === 4
                               ? 'bg-indigo-500'
-                              : pwdStrength.score === 2
+                              : pwdStrength.score === 3
                               ? 'bg-amber-500'
                               : 'bg-rose-500'
                             : 'bg-slate-200'
@@ -217,50 +219,124 @@ export const AuthPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 4 Security Requirements Checklist */}
-                <div className="grid grid-cols-2 gap-2 pt-1 text-[11px]">
-                  <div className="flex items-center gap-1.5">
-                    {pwdStrength.hasMinLength ? (
-                      <Check size={13} className="text-emerald-600 shrink-0 font-bold" />
+                {/* 5 Security Requirements Checklist */}
+                <div className="space-y-1.5 pt-1 text-[11px]">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 flex items-center justify-between">
+                    <span>Indikator Syarat ({pwdStrength.score}/5 Terpenuhi):</span>
+                    {pwdStrength.isValid ? (
+                      <span className="text-emerald-600 font-bold flex items-center gap-1">
+                        <CheckCircle2 size={12} /> Siap Mendaftar
+                      </span>
                     ) : (
-                      <X size={13} className="text-slate-400 shrink-0" />
+                      <span className="text-rose-500 font-medium">Lengkapi kriteria</span>
                     )}
-                    <span className={pwdStrength.hasMinLength ? 'text-slate-800 font-semibold' : 'text-slate-400'}>
-                      Min. 6 karakter
-                    </span>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
-                    {pwdStrength.hasUppercase ? (
-                      <Check size={13} className="text-emerald-600 shrink-0 font-bold" />
-                    ) : (
-                      <X size={13} className="text-slate-400 shrink-0" />
-                    )}
-                    <span className={pwdStrength.hasUppercase ? 'text-slate-800 font-semibold' : 'text-slate-400'}>
-                      Huruf besar (A-Z)
-                    </span>
-                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    {/* 1. Min 6 chars */}
+                    <div
+                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border transition ${
+                        pwdStrength.hasMinLength
+                          ? 'bg-emerald-50/80 border-emerald-300 text-emerald-900 font-semibold'
+                          : 'bg-white border-slate-200 text-slate-500'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        {pwdStrength.hasMinLength ? (
+                          <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                        ) : (
+                          <XCircle size={13} className="text-slate-300 shrink-0" />
+                        )}
+                        <span>Min. 6 karakter</span>
+                      </div>
+                      <span className="text-[10px] tabular-numbers opacity-80">
+                        {password.length}/6
+                      </span>
+                    </div>
 
-                  <div className="flex items-center gap-1.5">
-                    {pwdStrength.hasNumber ? (
-                      <Check size={13} className="text-emerald-600 shrink-0 font-bold" />
-                    ) : (
-                      <X size={13} className="text-slate-400 shrink-0" />
-                    )}
-                    <span className={pwdStrength.hasNumber ? 'text-slate-800 font-semibold' : 'text-slate-400'}>
-                      Angka (0-9)
-                    </span>
-                  </div>
+                    {/* 2. Lowercase */}
+                    <div
+                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border transition ${
+                        pwdStrength.hasLowercase
+                          ? 'bg-emerald-50/80 border-emerald-300 text-emerald-900 font-semibold'
+                          : 'bg-white border-slate-200 text-slate-500'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        {pwdStrength.hasLowercase ? (
+                          <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                        ) : (
+                          <XCircle size={13} className="text-slate-300 shrink-0" />
+                        )}
+                        <span>Huruf kecil</span>
+                      </div>
+                      <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-slate-100 text-slate-600">
+                        a-z
+                      </span>
+                    </div>
 
-                  <div className="flex items-center gap-1.5">
-                    {pwdStrength.hasSymbol ? (
-                      <Check size={13} className="text-emerald-600 shrink-0 font-bold" />
-                    ) : (
-                      <X size={13} className="text-slate-400 shrink-0" />
-                    )}
-                    <span className={pwdStrength.hasSymbol ? 'text-slate-800 font-semibold' : 'text-slate-400'}>
-                      Simbol (!@#$...)
-                    </span>
+                    {/* 3. Uppercase */}
+                    <div
+                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border transition ${
+                        pwdStrength.hasUppercase
+                          ? 'bg-emerald-50/80 border-emerald-300 text-emerald-900 font-semibold'
+                          : 'bg-white border-slate-200 text-slate-500'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        {pwdStrength.hasUppercase ? (
+                          <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                        ) : (
+                          <XCircle size={13} className="text-slate-300 shrink-0" />
+                        )}
+                        <span>Huruf besar</span>
+                      </div>
+                      <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-slate-100 text-slate-600">
+                        A-Z
+                      </span>
+                    </div>
+
+                    {/* 4. Numbers */}
+                    <div
+                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border transition ${
+                        pwdStrength.hasNumber
+                          ? 'bg-emerald-50/80 border-emerald-300 text-emerald-900 font-semibold'
+                          : 'bg-white border-slate-200 text-slate-500'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        {pwdStrength.hasNumber ? (
+                          <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                        ) : (
+                          <XCircle size={13} className="text-slate-300 shrink-0" />
+                        )}
+                        <span>Angka</span>
+                      </div>
+                      <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-slate-100 text-slate-600">
+                        0-9
+                      </span>
+                    </div>
+
+                    {/* 5. Symbols */}
+                    <div
+                      className={`sm:col-span-2 flex items-center justify-between px-2.5 py-1.5 rounded-lg border transition ${
+                        pwdStrength.hasSymbol
+                          ? 'bg-emerald-50/80 border-emerald-300 text-emerald-900 font-semibold'
+                          : 'bg-white border-slate-200 text-slate-500'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        {pwdStrength.hasSymbol ? (
+                          <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                        ) : (
+                          <XCircle size={13} className="text-slate-300 shrink-0" />
+                        )}
+                        <span>Simbol / Karakter Khusus</span>
+                      </div>
+                      <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
+                        !@#$%^&*
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>

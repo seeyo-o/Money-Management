@@ -15,26 +15,29 @@ export interface AuthUser {
 
 export interface PasswordStrength {
   hasMinLength: boolean;
+  hasLowercase: boolean;
   hasUppercase: boolean;
   hasNumber: boolean;
   hasSymbol: boolean;
   isValid: boolean;
-  score: number; // 0 to 4
+  score: number; // 0 to 5
 }
 
 export function validatePasswordStrength(pass: string): PasswordStrength {
   const hasMinLength = pass.length >= 6;
+  const hasLowercase = /[a-z]/.test(pass);
   const hasUppercase = /[A-Z]/.test(pass);
   const hasNumber = /[0-9]/.test(pass);
   const hasSymbol = /[^A-Za-z0-9]/.test(pass);
-  const score = [hasMinLength, hasUppercase, hasNumber, hasSymbol].filter(Boolean).length;
+  const score = [hasMinLength, hasLowercase, hasUppercase, hasNumber, hasSymbol].filter(Boolean).length;
   return {
     hasMinLength,
+    hasLowercase,
     hasUppercase,
     hasNumber,
     hasSymbol,
     score,
-    isValid: hasMinLength && hasUppercase && hasNumber && hasSymbol,
+    isValid: hasMinLength && hasLowercase && hasUppercase && hasNumber && hasSymbol,
   };
 }
 
@@ -101,7 +104,7 @@ export async function registerUser(email: string, pass: string): Promise<AuthUse
   const strength = validatePasswordStrength(pass);
   if (!strength.isValid) {
     throw new Error(
-      'Kata sandi wajib minimal 6 karakter, mengandung huruf besar (A-Z), angka (0-9), dan simbol (!@#$...).'
+      'Kata sandi wajib minimal 6 karakter, mengandung huruf besar (A-Z), huruf kecil (a-z), angka (0-9), dan simbol (!@#$...).'
     );
   }
 
