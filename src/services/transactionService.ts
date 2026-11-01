@@ -21,13 +21,19 @@ export async function fetchTransactions(uid: string): Promise<Transaction[]> {
     if (snap.empty) return [];
     return snap.docs
       .map((d) => ({ id: d.id, ...(d.data() as Omit<Transaction, 'id'>) }))
-      .map((t) => (t.categoryId === 'cat-shopping' ? { ...t, categoryId: 'cat-skincare' } : t));
+      .map((t) => {
+        if (t.categoryId === 'cat-shopping') return { ...t, categoryId: 'cat-skincare' };
+        if (t.categoryId === 'cat-entertainment') return { ...t, categoryId: 'cat-hangout-friends' };
+        return t;
+      });
   } else {
     const saved = localStorage.getItem(getTxLocalKey(uid));
     const list: Transaction[] = saved ? JSON.parse(saved) : DEFAULT_TRANSACTIONS;
-    return list.map((t) =>
-      t.categoryId === 'cat-shopping' ? { ...t, categoryId: 'cat-skincare' } : t
-    );
+    return list.map((t) => {
+      if (t.categoryId === 'cat-shopping') return { ...t, categoryId: 'cat-skincare' };
+      if (t.categoryId === 'cat-entertainment') return { ...t, categoryId: 'cat-hangout-friends' };
+      return t;
+    });
   }
 }
 

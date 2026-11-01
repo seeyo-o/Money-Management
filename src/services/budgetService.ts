@@ -44,7 +44,7 @@ export async function fetchCategories(uid: string): Promise<Category[]> {
     return CLEAN_DEFAULT_CATEGORIES;
   }
 
-  // 1. MIGRATION: Remove cat-shopping (Belanja Online dihapus)
+  // 1. MIGRATION: Remove cat-shopping & cat-entertainment (split into with friends & with gf)
   const hasShopping = rawCategories.some((c) => c.id === 'cat-shopping');
   if (hasShopping) {
     rawCategories = rawCategories.filter((c) => c.id !== 'cat-shopping');
@@ -53,7 +53,15 @@ export async function fetchCategories(uid: string): Promise<Category[]> {
     }
   }
 
-  // 2. MIGRATION: Ensure new categories (cat-vehicle-tax, cat-fashion, cat-skincare) exist
+  const hasOldEntertainment = rawCategories.some((c) => c.id === 'cat-entertainment');
+  if (hasOldEntertainment) {
+    rawCategories = rawCategories.filter((c) => c.id !== 'cat-entertainment');
+    if (isFirebaseConfigured && db) {
+      deleteDoc(doc(db, 'users', uid, 'budgets', 'cat-entertainment')).catch(() => {});
+    }
+  }
+
+  // 2. MIGRATION: Ensure new categories (cat-vehicle-tax, cat-fashion, cat-skincare, cat-hangout-friends, cat-hangout-gf) exist
   const existingIds = new Set(rawCategories.map((c) => c.id));
   const missingCategories = CLEAN_DEFAULT_CATEGORIES.filter((c) => !existingIds.has(c.id));
   if (missingCategories.length > 0) {
@@ -567,12 +575,13 @@ export async function resetUserDataToZero(uid: string): Promise<void> {
       batch.set(wRef, w);
     });
 
-    // 2. Reset all categories to 0 caps & delete legacy cat-shopping
+    // 2. Reset all categories to 0 caps & delete legacy categories
     CLEAN_DEFAULT_CATEGORIES.forEach((c) => {
       const cRef = doc(db, 'users', uid, 'budgets', c.id);
       batch.set(cRef, c);
     });
     batch.delete(doc(db, 'users', uid, 'budgets', 'cat-shopping'));
+    batch.delete(doc(db, 'users', uid, 'budgets', 'cat-entertainment'));
 
     // 3. Delete all transactions
     const txColRef = collection(db, 'users', uid, 'transactions');
