@@ -90,19 +90,28 @@ export async function saveCategory(uid: string, category: Category): Promise<voi
 export async function updateCategoryBudget(
   uid: string,
   categoryId: string,
-  newMonthlyCap: number
+  newMonthlyCap: number,
+  syncAllocation = false
 ): Promise<void> {
+  const patch: Record<string, any> = {
+    monthlyPlanCap: newMonthlyCap,
+    budgetLimit: newMonthlyCap,
+  };
+  if (syncAllocation) {
+    patch.currentMonthAllocated = newMonthlyCap;
+  }
+
   if (isFirebaseConfigured && db) {
     const docRef = doc(db, 'users', uid, 'budgets', categoryId);
-    await updateDoc(docRef, {
-      monthlyPlanCap: newMonthlyCap,
-      budgetLimit: newMonthlyCap,
-    });
+    await updateDoc(docRef, patch);
   } else {
     const current = await fetchCategories(uid);
     const updated = current.map((c) =>
       c.id === categoryId
-        ? { ...c, monthlyPlanCap: newMonthlyCap, budgetLimit: newMonthlyCap }
+        ? {
+            ...c,
+            ...patch,
+          }
         : c
     );
     localStorage.setItem(getCatLocalKey(uid), JSON.stringify(updated));
@@ -122,6 +131,135 @@ export async function fetchBudgetLedger(uid: string): Promise<BudgetLedgerEntry[
   }
 }
 
+export type AllocationAction = 'SET_TOTAL' | 'TOP_UP' | 'WITHDRAW';
+
+/**
+ * ATOMIC ADJUST / SETOR / TARIK ALOKASI ANGGARAN:
+ * Memungkinkan pengguna untuk:
+ * - 'SET_TOTAL': Mengoreksi atau mengatur total alokasi bulan ini langsung ke nominal baru (misal: dari 750k menjadi 400k).
+ * - 'WITHDRAW': Menarik kembali kelebihan alokasi kembali ke Saldo Bebas (Free Cash).
+ * - 'TOP_UP': Menambah alokasi di atas alokasi yang sudah ada.
+ * Serta secara opsional menyinkronkan monthlyPlanCap / budgetLimit jika diinginkan pengguna.
+ */
+export async function adjustBudgetAllocation(
+  uid: string,
+  budgetId: string,
+  action: AllocationAction,
+  amount: number,
+  periodMonth: string,
+  note?: string,
+  syncPlanCap = false
+): Promise<{ updatedCategory: Category; ledgerEntry: BudgetLedgerEntry }> {
+  const currentCategories = await fetchCategories(uid);
+  const targetCategory = currentCategories.find((c) => c.id === budgetId);
+
+  if (!targetCategory) {
+    throw new Error('Kategori anggaran tidak ditemukan.');
+  }
+
+  const prevAllocated = targetCategory.currentMonthAllocated || 0;
+  let newAllocated = prevAllocated;
+  let ledgerType: BudgetMutationType = 'MONTHLY_ALLOCATION';
+  let mutationAmount = 0;
+  let defaultNote = '';
+
+  if (action === 'SET_TOTAL') {
+    newAllocated = Math.max(0, amount);
+    const delta = newAllocated - prevAllocated;
+
+    if (delta > 0) {
+      ledgerType = 'MONTHLY_ALLOCATION';
+      mutationAmount = delta;
+      defaultNote = `Penyesuaian alokasi: Rp ${prevAllocated.toLocaleString('id-ID')} -> Rp ${newAllocated.toLocaleString('id-ID')} (+Rp ${delta.toLocaleString('id-ID')})`;
+    } else if (delta < 0) {
+      ledgerType = 'ALLOCATION_WITHDRAWAL';
+      mutationAmount = Math.abs(delta);
+      defaultNote = `Koreksi alokasi: Rp ${prevAllocated.toLocaleString('id-ID')} -> Rp ${newAllocated.toLocaleString('id-ID')} (Penarikan Rp ${mutationAmount.toLocaleString('id-ID')} kembali ke Saldo Bebas)`;
+    } else {
+      mutationAmount = 0;
+      defaultNote = `Pembaruan alokasi anggaran tetap Rp ${newAllocated.toLocaleString('id-ID')}`;
+    }
+  } else if (action === 'WITHDRAW') {
+    if (amount <= 0) {
+      throw new Error('Nominal penarikan harus lebih dari Rp 0.');
+    }
+    if (amount > prevAllocated) {
+      throw new Error(
+        `Nominal penarikan (Rp ${amount.toLocaleString('id-ID')}) melebihi alokasi yang tersedia (Rp ${prevAllocated.toLocaleString('id-ID')}).`
+      );
+    }
+    newAllocated = Math.max(0, prevAllocated - amount);
+    ledgerType = 'ALLOCATION_WITHDRAWAL';
+    mutationAmount = amount;
+    defaultNote = `Penarikan alokasi Rp ${amount.toLocaleString('id-ID')} kembali ke Saldo Bebas (Sisa Alokasi: Rp ${newAllocated.toLocaleString('id-ID')})`;
+  } else if (action === 'TOP_UP') {
+    if (amount <= 0) {
+      throw new Error('Nominal setoran alokasi harus lebih dari Rp 0.');
+    }
+    newAllocated = prevAllocated + amount;
+    ledgerType = 'MONTHLY_ALLOCATION';
+    mutationAmount = amount;
+    defaultNote = `Setoran alokasi tambahan Rp ${amount.toLocaleString('id-ID')}`;
+  }
+
+  const updatedCategory: Category = {
+    ...targetCategory,
+    currentMonthAllocated: newAllocated,
+    ...(syncPlanCap
+      ? {
+          monthlyPlanCap: newAllocated,
+          budgetLimit: newAllocated,
+        }
+      : {}),
+  };
+
+  const ledgerId = `bl-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const ledgerEntry: BudgetLedgerEntry = {
+    id: ledgerId,
+    type: ledgerType,
+    budgetId: targetCategory.id,
+    budgetName: targetCategory.name,
+    amount: mutationAmount,
+    date: todayStr,
+    periodMonth,
+    timestamp: Date.now(),
+    note: note && note.trim() ? note.trim() : defaultNote,
+  };
+
+  if (isFirebaseConfigured && db) {
+    const batch = writeBatch(db);
+
+    const catDocRef = doc(db, 'users', uid, 'budgets', targetCategory.id);
+    const updatePayload: Record<string, any> = { currentMonthAllocated: newAllocated };
+    if (syncPlanCap) {
+      updatePayload.monthlyPlanCap = newAllocated;
+      updatePayload.budgetLimit = newAllocated;
+    }
+    batch.update(catDocRef, updatePayload);
+
+    if (mutationAmount > 0) {
+      const ledgerDocRef = doc(db, 'users', uid, 'budget_ledger', ledgerId);
+      batch.set(ledgerDocRef, ledgerEntry);
+    }
+
+    await batch.commit();
+  } else {
+    const updatedList = currentCategories.map((c) =>
+      c.id === budgetId ? updatedCategory : c
+    );
+    localStorage.setItem(getCatLocalKey(uid), JSON.stringify(updatedList));
+
+    if (mutationAmount > 0) {
+      const currentLedger = await fetchBudgetLedger(uid);
+      localStorage.setItem(getLedgerLocalKey(uid), JSON.stringify([ledgerEntry, ...currentLedger]));
+    }
+  }
+
+  return { updatedCategory, ledgerEntry };
+}
+
 /**
  * ATOMIC SETOR ALOKASI BULANAN (MONTHLY_ALLOCATION):
  * Menambah kuota setoran alokasi bulan berjalan ke kategori dan mencatat mutasi internal ke budget_ledger.
@@ -133,55 +271,7 @@ export async function allocateMonthlyBudget(
   periodMonth: string,
   note = 'Setoran alokasi rutin bulanan'
 ): Promise<{ updatedCategory: Category; ledgerEntry: BudgetLedgerEntry }> {
-  const currentCategories = await fetchCategories(uid);
-  const targetCategory = currentCategories.find((c) => c.id === budgetId);
-
-  if (!targetCategory) {
-    throw new Error('Kategori anggaran tidak ditemukan.');
-  }
-
-  const updatedAllocated = (targetCategory.currentMonthAllocated || 0) + amount;
-  const updatedCategory: Category = {
-    ...targetCategory,
-    currentMonthAllocated: updatedAllocated,
-  };
-
-  const ledgerId = `bl-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-  const todayStr = new Date().toISOString().split('T')[0];
-
-  const ledgerEntry: BudgetLedgerEntry = {
-    id: ledgerId,
-    type: 'MONTHLY_ALLOCATION',
-    budgetId: targetCategory.id,
-    budgetName: targetCategory.name,
-    amount,
-    date: todayStr,
-    periodMonth,
-    timestamp: Date.now(),
-    note,
-  };
-
-  if (isFirebaseConfigured && db) {
-    const batch = writeBatch(db);
-
-    const catDocRef = doc(db, 'users', uid, 'budgets', targetCategory.id);
-    batch.update(catDocRef, { currentMonthAllocated: updatedAllocated });
-
-    const ledgerDocRef = doc(db, 'users', uid, 'budget_ledger', ledgerId);
-    batch.set(ledgerDocRef, ledgerEntry);
-
-    await batch.commit();
-  } else {
-    const updatedList = currentCategories.map((c) =>
-      c.id === budgetId ? updatedCategory : c
-    );
-    localStorage.setItem(getCatLocalKey(uid), JSON.stringify(updatedList));
-
-    const currentLedger = await fetchBudgetLedger(uid);
-    localStorage.setItem(getLedgerLocalKey(uid), JSON.stringify([ledgerEntry, ...currentLedger]));
-  }
-
-  return { updatedCategory, ledgerEntry };
+  return adjustBudgetAllocation(uid, budgetId, 'TOP_UP', amount, periodMonth, note);
 }
 
 /**

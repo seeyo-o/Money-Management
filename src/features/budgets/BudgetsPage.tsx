@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useFinance } from '../../context/FinanceContext';
 import type { PillarType, Category, BudgetMode } from '../../domain/types';
+import type { AllocationAction } from '../../services/budgetService';
 import { formatIDR, parseSmartAmount } from '../../domain/formatters';
 import { IconRenderer } from '../../components/ui/IconRenderer';
 import { AllocateBudgetModal } from './AllocateBudgetModal';
@@ -47,6 +48,8 @@ export const BudgetsPage: React.FC = () => {
   // Modals state
   const [isAllocateModalOpen, setIsAllocateModalOpen] = useState<boolean>(false);
   const [allocateDefaultBudgetId, setAllocateDefaultBudgetId] = useState<string | undefined>();
+  const [allocateInitialMode, setAllocateInitialMode] = useState<AllocationAction>('SET_TOTAL');
+  const [syncAllocationOnCapChange, setSyncAllocationOnCapChange] = useState<boolean>(true);
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState<boolean>(false);
   const [isRolloverModalOpen, setIsRolloverModalOpen] = useState<boolean>(false);
 
@@ -92,18 +95,20 @@ export const BudgetsPage: React.FC = () => {
   const handleOpenEdit = (c: Category) => {
     setEditingCategory(c);
     setNewLimitStr(formatIDR(c.monthlyPlanCap || c.budgetLimit, false));
+    setSyncAllocationOnCapChange(true);
   };
 
   const handleSaveBudget = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingCategory) return;
     const parsed = parseSmartAmount(newLimitStr);
-    await updateBudgetLimit(editingCategory.id, parsed);
+    await updateBudgetLimit(editingCategory.id, parsed, syncAllocationOnCapChange);
     setEditingCategory(null);
   };
 
-  const openAllocateFor = (catId: string) => {
+  const openAllocateFor = (catId?: string, mode: AllocationAction = 'SET_TOTAL') => {
     setAllocateDefaultBudgetId(catId);
+    setAllocateInitialMode(mode);
     setIsAllocateModalOpen(true);
   };
 
@@ -126,14 +131,11 @@ export const BudgetsPage: React.FC = () => {
         {/* Global Action Modals Trigger */}
         <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={() => {
-              setAllocateDefaultBudgetId(undefined);
-              setIsAllocateModalOpen(true);
-            }}
+            onClick={() => openAllocateFor(undefined, 'SET_TOTAL')}
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-teal-700 hover:bg-teal-800 rounded-xl shadow-sm transition"
           >
-            <ArrowUpCircle size={15} />
-            <span>Setor Alokasi Bulanan</span>
+            <Sliders size={14} />
+            <span>Kelola / Setor Alokasi</span>
           </button>
 
           <button
@@ -405,15 +407,29 @@ export const BudgetsPage: React.FC = () => {
                             <span className="text-[11px] text-slate-400 font-medium">
                               • Plafon: <strong className="text-slate-600 font-semibold">{formatIDR(cat.allowedSpendingLimit)}</strong>
                             </span>
+                            <span className="text-[11px] text-slate-400 font-medium">
+                              • Alokasi: <strong className="text-slate-800 font-bold">{formatIDR(cat.currentMonthAllocated || 0)}</strong>
+                            </span>
                           </div>
+                          {(cat.currentMonthAllocated || 0) > (cat.monthlyPlanCap || 0) && (cat.monthlyPlanCap || 0) > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => openAllocateFor(cat.id, 'SET_TOTAL')}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300 transition mt-1.5"
+                              title="Alokasi saat ini melebihi batas plafon bulanan. Klik untuk atur ulang atau tarik dana berlebih."
+                            >
+                              <AlertTriangle size={11} className="text-amber-700 shrink-0" />
+                              <span>Alokasi Berlebih: +{formatIDR((cat.currentMonthAllocated || 0) - (cat.monthlyPlanCap || 0))} (Koreksi)</span>
+                            </button>
+                          )}
                         </div>
                       </div>
 
                       <div className="flex items-center gap-1 shrink-0">
                         <button
-                          onClick={() => openAllocateFor(cat.id)}
+                          onClick={() => openAllocateFor(cat.id, 'SET_TOTAL')}
                           className="p-1.5 rounded-lg text-slate-400 hover:text-teal-700 hover:bg-teal-50 transition"
-                          title="Setor Alokasi Bulanan"
+                          title="Kelola Alokasi (Setor / Tarik / Koreksi)"
                         >
                           <Plus size={15} />
                         </button>
@@ -555,9 +571,9 @@ export const BudgetsPage: React.FC = () => {
                       </div>
 
                       <button
-                        onClick={() => openAllocateFor(fund.id)}
+                        onClick={() => openAllocateFor(fund.id, 'SET_TOTAL')}
                         className="p-1.5 rounded-lg text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200/60 transition shrink-0"
-                        title="Setor Tabungan Sinking Fund"
+                        title="Kelola Tabungan Sinking Fund (Setor / Tarik / Koreksi)"
                       >
                         <Plus size={15} />
                       </button>
@@ -613,10 +629,10 @@ export const BudgetsPage: React.FC = () => {
                       Pengeluaran langsung potong brankas
                     </span>
                     <button
-                      onClick={() => openAllocateFor(fund.id)}
+                      onClick={() => openAllocateFor(fund.id, 'SET_TOTAL')}
                       className="text-xs font-bold text-teal-700 hover:text-teal-900 flex items-center gap-1"
                     >
-                      <span>Setor Tabungan</span>
+                      <span>Kelola Tabungan</span>
                       <span className="text-sm font-semibold">&rarr;</span>
                     </button>
                   </div>
@@ -676,6 +692,7 @@ export const BudgetsPage: React.FC = () => {
         isOpen={isAllocateModalOpen}
         onClose={() => setIsAllocateModalOpen(false)}
         defaultBudgetId={allocateDefaultBudgetId}
+        initialMode={allocateInitialMode}
       />
 
       <EmergencyReallocateModal
@@ -732,6 +749,19 @@ export const BudgetsPage: React.FC = () => {
                   autoFocus
                 />
               </div>
+
+              {/* Checkbox to sync current month allocated */}
+              <label className="flex items-center gap-2 pt-1 text-xs text-slate-700 font-medium cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={syncAllocationOnCapChange}
+                  onChange={(e) => setSyncAllocationOnCapChange(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 text-teal-700 focus:ring-teal-500"
+                />
+                <span>
+                  Sesuaikan juga alokasi dana bulan ini ke plafon baru ini
+                </span>
+              </label>
 
               <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
                 <button

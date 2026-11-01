@@ -22,6 +22,8 @@ import {
   saveCategory as apiSaveCategory,
   updateCategoryBudget as apiUpdateCategoryBudget,
   allocateMonthlyBudget as apiAllocateMonthlyBudget,
+  adjustBudgetAllocation as apiAdjustBudgetAllocation,
+  type AllocationAction,
   executeMonthEndRollover as apiExecuteMonthEndRollover,
   emergencyReallocate as apiEmergencyReallocate,
   fetchBudgetLedger as apiFetchBudgetLedger,
@@ -57,9 +59,16 @@ interface FinanceContextType {
   addWallet: (walletData: Omit<Wallet, 'id'>) => Promise<void>;
   updateWallet: (wallet: Wallet) => Promise<void>;
   deleteWallet: (walletId: string) => Promise<void>;
-  updateBudgetLimit: (categoryId: string, limit: number) => Promise<void>;
+  updateBudgetLimit: (categoryId: string, limit: number, syncAllocation?: boolean) => Promise<void>;
   saveCategory: (category: Category) => Promise<void>;
   allocateBudget: (budgetId: string, amount: number, note?: string) => Promise<void>;
+  adjustBudgetAllocation: (
+    budgetId: string,
+    action: AllocationAction,
+    amount: number,
+    note?: string,
+    syncPlanCap?: boolean
+  ) => Promise<void>;
   triggerMonthEndRollover: (prevPeriod: string, nextPeriod: string) => Promise<void>;
   performEmergencyReallocation: (
     fromBudgetId: string,
@@ -235,12 +244,23 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setWallets((prev) => prev.filter((w) => w.id !== walletId));
   };
 
-  const updateBudgetLimit = async (categoryId: string, limit: number) => {
+  const updateBudgetLimit = async (
+    categoryId: string,
+    limit: number,
+    syncAllocation = false
+  ) => {
     if (!user) return;
-    await apiUpdateCategoryBudget(user.uid, categoryId, limit);
+    await apiUpdateCategoryBudget(user.uid, categoryId, limit, syncAllocation);
     setCategories((prev) =>
       prev.map((c) =>
-        c.id === categoryId ? { ...c, monthlyPlanCap: limit, budgetLimit: limit } : c
+        c.id === categoryId
+          ? {
+              ...c,
+              monthlyPlanCap: limit,
+              budgetLimit: limit,
+              ...(syncAllocation ? { currentMonthAllocated: limit } : {}),
+            }
+          : c
       )
     );
   };
@@ -257,18 +277,32 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   };
 
-  // Setor alokasi rutin bulanan
-  const allocateBudget = async (budgetId: string, amount: number, note?: string) => {
+  // Setor / Tarik / Koreksi alokasi anggaran bulanan
+  const adjustBudgetAllocation = async (
+    budgetId: string,
+    action: AllocationAction,
+    amount: number,
+    note?: string,
+    syncPlanCap = false
+  ) => {
     if (!user) return;
-    const { updatedCategory, ledgerEntry } = await apiAllocateMonthlyBudget(
+    const { updatedCategory, ledgerEntry } = await apiAdjustBudgetAllocation(
       user.uid,
       budgetId,
+      action,
       amount,
       selectedMonth,
-      note
+      note,
+      syncPlanCap
     );
     setCategories((prev) => prev.map((c) => (c.id === budgetId ? updatedCategory : c)));
-    setBudgetLedger((prev) => [ledgerEntry, ...prev]);
+    if (ledgerEntry.amount > 0) {
+      setBudgetLedger((prev) => [ledgerEntry, ...prev]);
+    }
+  };
+
+  const allocateBudget = async (budgetId: string, amount: number, note?: string) => {
+    await adjustBudgetAllocation(budgetId, 'TOP_UP', amount, note);
   };
 
   // Rollover pergantian bulan
@@ -351,6 +385,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         updateBudgetLimit,
         saveCategory: saveCategoryAction,
         allocateBudget,
+        adjustBudgetAllocation,
         triggerMonthEndRollover,
         performEmergencyReallocation,
         resetAllDataToZero,
