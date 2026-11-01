@@ -12,9 +12,10 @@ import {
 } from 'lucide-react';
 import { useFinance } from '../../context/FinanceContext';
 import type { TransactionType, PillarType } from '../../domain/types';
-import { formatIDR, formatShortDateID, getMonthLabel, generateMultiYearMonthOptions } from '../../domain/formatters';
+import { formatIDR, formatShortDateID, getMonthLabel } from '../../domain/formatters';
 import { IconRenderer } from '../../components/ui/IconRenderer';
 import { TransactionModal } from './TransactionModal';
+import { MonthPicker } from '../../components/ui/MonthPicker';
 
 export const TransactionsPage: React.FC = () => {
   const { transactions, wallets, categories, deleteTransaction, selectedMonth } = useFinance();
@@ -25,10 +26,6 @@ export const TransactionsPage: React.FC = () => {
   const [selectedPillar, setSelectedPillar] = useState<PillarType | 'all'>('all');
   const [pageMonthFilter, setPageMonthFilter] = useState<string>('GLOBAL');
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  const monthGroups = useMemo(() => {
-    return generateMultiYearMonthOptions(selectedMonth);
-  }, [selectedMonth]);
 
   const walletMap = new Map(wallets.map((w) => [w.id, w]));
   const categoryMap = new Map(categories.map((c) => [c.id, c]));
@@ -109,23 +106,13 @@ export const TransactionsPage: React.FC = () => {
           )}
         </div>
 
-        <select
-          value={pageMonthFilter}
-          onChange={(e) => setPageMonthFilter(e.target.value)}
-          className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:border-teal-700 cursor-pointer"
-        >
-          <option value="GLOBAL">Bulan Aktif: {getMonthLabel(selectedMonth)}</option>
-          <option value="ALL">Semua Waktu (Riwayat Lengkap)</option>
-          {monthGroups.map((g) => (
-            <optgroup key={g.year} label={g.label}>
-              {g.options.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
+        <MonthPicker
+          value={pageMonthFilter === 'GLOBAL' ? selectedMonth : pageMonthFilter}
+          onChange={(newVal) => setPageMonthFilter(newVal)}
+          align="left"
+          showAllOption={true}
+          allOptionLabel="Semua Waktu"
+        />
 
         <select
           value={selectedType}

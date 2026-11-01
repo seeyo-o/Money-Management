@@ -15,8 +15,9 @@ import {
 import { useFinance } from '../../context/FinanceContext';
 import { useAuth } from '../../context/AuthContext';
 import { generateBookkeepingReport } from '../../domain/bookkeepingEngine';
-import { formatIDR, formatDateID, generateMultiYearMonthOptions } from '../../domain/formatters';
+import { formatIDR, formatDateID } from '../../domain/formatters';
 import { exportBookkeepingPDF } from './pdfGenerator';
+import { MonthPicker } from '../../components/ui/MonthPicker';
 
 export const BookkeepingPage: React.FC = () => {
   const { wallets, categories, transactions, budgetLedger, selectedMonth, setSelectedMonth } =
@@ -24,10 +25,6 @@ export const BookkeepingPage: React.FC = () => {
   const { user } = useAuth();
 
   const [selectedWalletFilter, setSelectedWalletFilter] = useState<string>('all');
-
-  const monthGroups = useMemo(() => {
-    return generateMultiYearMonthOptions(selectedMonth);
-  }, [selectedMonth]);
 
   const report = useMemo(() => {
     return generateBookkeepingReport(
@@ -68,22 +65,12 @@ export const BookkeepingPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Month Selector */}
-          <select
+          {/* Month & Year Picker */}
+          <MonthPicker
             value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-teal-700 cursor-pointer"
-          >
-            {monthGroups.map((group) => (
-              <optgroup key={group.year} label={group.label}>
-                {group.options.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
+            onChange={setSelectedMonth}
+            align="left"
+          />
 
           {/* Account Filter */}
           <select

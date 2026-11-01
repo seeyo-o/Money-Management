@@ -1,8 +1,9 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Plus, Landmark, Smartphone, Banknote, LogOut } from 'lucide-react';
 import { useFinance } from '../../context/FinanceContext';
 import { useAuth } from '../../context/AuthContext';
-import { formatIDR, generateMultiYearMonthOptions } from '../../domain/formatters';
+import { formatIDR } from '../../domain/formatters';
+import { MonthPicker } from '../ui/MonthPicker';
 
 interface HeaderProps {
   onOpenAddModal: () => void;
@@ -19,10 +20,6 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAddModal, pageTitle }) => 
     netWorth,
   } = useFinance();
   const { logout, user } = useAuth();
-
-  const monthGroups = useMemo(() => {
-    return generateMultiYearMonthOptions(selectedMonth);
-  }, [selectedMonth]);
 
   return (
     <header className="sticky top-0 z-30 bg-[#F8FAFC]/90 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-6 lg:px-8 py-3.5 transition-all">
@@ -89,22 +86,12 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAddModal, pageTitle }) => 
 
         {/* Right: Month Selector & Quick Add Button */}
         <div className="flex items-center gap-2 self-end sm:self-auto">
-          {/* Month Dropdown */}
-          <select
+          {/* Elegant Month & Year Picker */}
+          <MonthPicker
             value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="text-xs font-semibold px-2.5 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 shadow-subtle focus:outline-none focus:border-teal-700 cursor-pointer"
-          >
-            {monthGroups.map((group) => (
-              <optgroup key={group.year} label={group.label}>
-                {group.options.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
+            onChange={setSelectedMonth}
+            align="right"
+          />
 
           {/* Quick Add Button */}
           <button
