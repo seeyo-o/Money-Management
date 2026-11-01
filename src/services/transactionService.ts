@@ -19,21 +19,28 @@ export async function fetchTransactions(uid: string): Promise<Transaction[]> {
     const q = query(colRef, orderBy('date', 'desc'));
     const snap = await getDocs(q);
     if (snap.empty) return [];
+    const remapCategory = (catId?: string) => {
+      if (catId === 'cat-shopping') return 'cat-skincare';
+      if (catId === 'cat-entertainment') return 'cat-hangout-friends';
+      if (catId === 'cat-coffee') return 'cat-hangout-friends';
+      if (catId === 'cat-housing') return 'cat-bills';
+      return catId;
+    };
+
     return snap.docs
       .map((d) => ({ id: d.id, ...(d.data() as Omit<Transaction, 'id'>) }))
-      .map((t) => {
-        if (t.categoryId === 'cat-shopping') return { ...t, categoryId: 'cat-skincare' };
-        if (t.categoryId === 'cat-entertainment') return { ...t, categoryId: 'cat-hangout-friends' };
-        return t;
-      });
+      .map((t) => ({ ...t, categoryId: remapCategory(t.categoryId) }));
   } else {
     const saved = localStorage.getItem(getTxLocalKey(uid));
     const list: Transaction[] = saved ? JSON.parse(saved) : DEFAULT_TRANSACTIONS;
-    return list.map((t) => {
-      if (t.categoryId === 'cat-shopping') return { ...t, categoryId: 'cat-skincare' };
-      if (t.categoryId === 'cat-entertainment') return { ...t, categoryId: 'cat-hangout-friends' };
-      return t;
-    });
+    const remapCategory = (catId?: string) => {
+      if (catId === 'cat-shopping') return 'cat-skincare';
+      if (catId === 'cat-entertainment') return 'cat-hangout-friends';
+      if (catId === 'cat-coffee') return 'cat-hangout-friends';
+      if (catId === 'cat-housing') return 'cat-bills';
+      return catId;
+    };
+    return list.map((t) => ({ ...t, categoryId: remapCategory(t.categoryId) }));
   }
 }
 

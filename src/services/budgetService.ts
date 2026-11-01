@@ -44,20 +44,15 @@ export async function fetchCategories(uid: string): Promise<Category[]> {
     return CLEAN_DEFAULT_CATEGORIES;
   }
 
-  // 1. MIGRATION: Remove cat-shopping & cat-entertainment (split into with friends & with gf)
-  const hasShopping = rawCategories.some((c) => c.id === 'cat-shopping');
-  if (hasShopping) {
-    rawCategories = rawCategories.filter((c) => c.id !== 'cat-shopping');
+  // 1. MIGRATION: Remove deleted categories (cat-shopping, cat-entertainment, cat-housing, cat-coffee)
+  const deprecatedIds = ['cat-shopping', 'cat-entertainment', 'cat-housing', 'cat-coffee'];
+  const hasDeprecated = rawCategories.some((c) => deprecatedIds.includes(c.id));
+  if (hasDeprecated) {
+    rawCategories = rawCategories.filter((c) => !deprecatedIds.includes(c.id));
     if (isFirebaseConfigured && db) {
-      deleteDoc(doc(db, 'users', uid, 'budgets', 'cat-shopping')).catch(() => {});
-    }
-  }
-
-  const hasOldEntertainment = rawCategories.some((c) => c.id === 'cat-entertainment');
-  if (hasOldEntertainment) {
-    rawCategories = rawCategories.filter((c) => c.id !== 'cat-entertainment');
-    if (isFirebaseConfigured && db) {
-      deleteDoc(doc(db, 'users', uid, 'budgets', 'cat-entertainment')).catch(() => {});
+      deprecatedIds.forEach((dId) => {
+        deleteDoc(doc(db, 'users', uid, 'budgets', dId)).catch(() => {});
+      });
     }
   }
 
@@ -580,8 +575,9 @@ export async function resetUserDataToZero(uid: string): Promise<void> {
       const cRef = doc(db, 'users', uid, 'budgets', c.id);
       batch.set(cRef, c);
     });
-    batch.delete(doc(db, 'users', uid, 'budgets', 'cat-shopping'));
-    batch.delete(doc(db, 'users', uid, 'budgets', 'cat-entertainment'));
+    ['cat-shopping', 'cat-entertainment', 'cat-housing', 'cat-coffee'].forEach((dId) => {
+      batch.delete(doc(db, 'users', uid, 'budgets', dId));
+    });
 
     // 3. Delete all transactions
     const txColRef = collection(db, 'users', uid, 'transactions');
