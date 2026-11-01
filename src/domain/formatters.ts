@@ -99,3 +99,61 @@ export function getMonthLabel(yearMonth: string): string {
   const mIndex = parseInt(month, 10) - 1;
   return `${ID_MONTHS[mIndex] || month} ${year}`;
 }
+
+export interface MonthOptionGroup {
+  year: number;
+  label: string;
+  options: { label: string; value: string }[];
+}
+
+/**
+ * Generates structured month options spanning across multiple years.
+ * By default covers from (currentYear - 2) to (currentYear + 6) -> 9 years total.
+ * E.g., in 2026: covers 2024 through 2032!
+ * Automatically includes any year requested in ensureYearOrMonth.
+ */
+export function generateMultiYearMonthOptions(
+  ensureYearOrMonth?: string | number,
+  startYearOffset = -2,
+  endYearOffset = 6
+): MonthOptionGroup[] {
+  const currentYear = new Date().getFullYear();
+  let startYear = currentYear + startYearOffset;
+  let endYear = currentYear + endYearOffset;
+
+  if (ensureYearOrMonth) {
+    const y =
+      typeof ensureYearOrMonth === 'number'
+        ? ensureYearOrMonth
+        : parseInt(String(ensureYearOrMonth).split('-')[0], 10);
+    if (!isNaN(y)) {
+      if (y < startYear) startYear = y;
+      if (y > endYear) endYear = y;
+    }
+  }
+
+  const groups: MonthOptionGroup[] = [];
+  for (let y = startYear; y <= endYear; y++) {
+    const options = ID_MONTHS.map((mName, idx) => ({
+      label: `${mName} ${y}`,
+      value: `${y}-${String(idx + 1).padStart(2, '0')}`,
+    }));
+    groups.push({
+      year: y,
+      label: `Tahun ${y}`,
+      options,
+    });
+  }
+
+  return groups;
+}
+
+export function getFlatMultiYearMonthOptions(
+  ensureYearOrMonth?: string | number,
+  startYearOffset = -2,
+  endYearOffset = 6
+): { label: string; value: string; year: number }[] {
+  const groups = generateMultiYearMonthOptions(ensureYearOrMonth, startYearOffset, endYearOffset);
+  return groups.flatMap((g) => g.options.map((opt) => ({ ...opt, year: g.year })));
+}
+

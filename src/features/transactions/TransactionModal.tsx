@@ -18,7 +18,15 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   defaultType = 'EXPENSE',
   defaultWalletId,
 }) => {
-  const { wallets, categories, addTransaction } = useFinance();
+  const { wallets, categories, addTransaction, selectedMonth } = useFinance();
+
+  const getSmartDate = () => {
+    const today = new Date().toISOString().split('T')[0];
+    if (selectedMonth && !today.startsWith(selectedMonth)) {
+      return `${selectedMonth}-01`;
+    }
+    return today;
+  };
 
   const [type, setType] = useState<TransactionType>(defaultType);
   const [amount, setAmount] = useState<number>(0);
@@ -28,7 +36,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const [adminFee, setAdminFee] = useState<number>(0);
   const [isVaultSpend, setIsVaultSpend] = useState<boolean>(false);
   const [note, setNote] = useState<string>('');
-  const [date, setDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState<string>(getSmartDate);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
@@ -40,7 +48,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       setIsVaultSpend(false);
       setNote('');
       setError(null);
-      setDate(new Date().toISOString().split('T')[0]);
+      setDate(getSmartDate());
 
       if (defaultWalletId) {
         setWalletId(defaultWalletId);

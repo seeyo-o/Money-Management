@@ -22,10 +22,16 @@ interface RolloverSummaryModalProps {
 export const RolloverSummaryModal: React.FC<RolloverSummaryModalProps> = ({ isOpen, onClose }) => {
   const { categories, transactions, selectedMonth, triggerMonthEndRollover } = useFinance();
 
-  // Compute previous month string (e.g. if selectedMonth is 2026-11, prev is 2026-10)
+  // Compute previous and next month string relative to selectedMonth
   const prevMonthStr = useMemo(() => {
     const [y, m] = selectedMonth.split('-').map(Number);
     const date = new Date(y, m - 2, 1);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  }, [selectedMonth]);
+
+  const nextMonthStr = useMemo(() => {
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const date = new Date(y, m, 1);
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
   }, [selectedMonth]);
 
@@ -119,6 +125,38 @@ export const RolloverSummaryModal: React.FC<RolloverSummaryModalProps> = ({ isOp
             <p className="text-indigo-800">
               Sisa uang dari alokasi bulan lalu <strong>TIDAK HANGUS</strong> dan otomatis dialirkan ke dalam Brankas Akumulasi Cadangan (Vault). Sesuai aturan disiplin, sisa ini <strong>TIDAK AKAN</strong> menaikkan limit belanja bulan baru demi mencegah inflasi gaya hidup (Lifestyle Creep).
             </p>
+          </div>
+
+          {/* Quick Presets */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setFromPeriod(prevMonthStr);
+                setToPeriod(selectedMonth);
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition border ${
+                fromPeriod === prevMonthStr && toPeriod === selectedMonth
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              Tutup {prevMonthStr} &rarr; Masuk {selectedMonth}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFromPeriod(selectedMonth);
+                setToPeriod(nextMonthStr);
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition border ${
+                fromPeriod === selectedMonth && toPeriod === nextMonthStr
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              Tutup {selectedMonth} &rarr; Masuk {nextMonthStr}
+            </button>
           </div>
 
           {/* Period Selector */}

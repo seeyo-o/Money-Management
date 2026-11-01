@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Plus, Landmark, Smartphone, Banknote, LogOut } from 'lucide-react';
 import { useFinance } from '../../context/FinanceContext';
 import { useAuth } from '../../context/AuthContext';
-import { formatIDR, ID_MONTHS } from '../../domain/formatters';
+import { formatIDR, generateMultiYearMonthOptions } from '../../domain/formatters';
 
 interface HeaderProps {
   onOpenAddModal: () => void;
@@ -20,11 +20,9 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAddModal, pageTitle }) => 
   } = useFinance();
   const { logout, user } = useAuth();
 
-  const currentYear = new Date().getFullYear();
-  const monthOptions = ID_MONTHS.map((mName, idx) => {
-    const val = `${currentYear}-${String(idx + 1).padStart(2, '0')}`;
-    return { label: `${mName} ${currentYear}`, value: val };
-  });
+  const monthGroups = useMemo(() => {
+    return generateMultiYearMonthOptions(selectedMonth);
+  }, [selectedMonth]);
 
   return (
     <header className="sticky top-0 z-30 bg-[#F8FAFC]/90 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-6 lg:px-8 py-3.5 transition-all">
@@ -95,12 +93,16 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAddModal, pageTitle }) => 
           <select
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
-            className="text-xs font-semibold px-2.5 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 shadow-subtle focus:outline-none focus:border-teal-700"
+            className="text-xs font-semibold px-2.5 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 shadow-subtle focus:outline-none focus:border-teal-700 cursor-pointer"
           >
-            {monthOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
+            {monthGroups.map((group) => (
+              <optgroup key={group.year} label={group.label}>
+                {group.options.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
 

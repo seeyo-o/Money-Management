@@ -15,7 +15,7 @@ import {
 import { useFinance } from '../../context/FinanceContext';
 import { useAuth } from '../../context/AuthContext';
 import { generateBookkeepingReport } from '../../domain/bookkeepingEngine';
-import { formatIDR, formatDateID, ID_MONTHS } from '../../domain/formatters';
+import { formatIDR, formatDateID, generateMultiYearMonthOptions } from '../../domain/formatters';
 import { exportBookkeepingPDF } from './pdfGenerator';
 
 export const BookkeepingPage: React.FC = () => {
@@ -25,11 +25,9 @@ export const BookkeepingPage: React.FC = () => {
 
   const [selectedWalletFilter, setSelectedWalletFilter] = useState<string>('all');
 
-  const currentYear = new Date().getFullYear();
-  const monthOptions = ID_MONTHS.map((mName, idx) => {
-    const val = `${currentYear}-${String(idx + 1).padStart(2, '0')}`;
-    return { label: `${mName} ${currentYear}`, value: val };
-  });
+  const monthGroups = useMemo(() => {
+    return generateMultiYearMonthOptions(selectedMonth);
+  }, [selectedMonth]);
 
   const report = useMemo(() => {
     return generateBookkeepingReport(
@@ -74,12 +72,16 @@ export const BookkeepingPage: React.FC = () => {
           <select
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
-            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-teal-700"
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-teal-700 cursor-pointer"
           >
-            {monthOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
+            {monthGroups.map((group) => (
+              <optgroup key={group.year} label={group.label}>
+                {group.options.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
 

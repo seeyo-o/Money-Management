@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Search,
   Filter,
@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { useFinance } from '../../context/FinanceContext';
 import type { TransactionType, PillarType } from '../../domain/types';
-import { formatIDR, formatShortDateID } from '../../domain/formatters';
+import { formatIDR, formatShortDateID, getMonthLabel, generateMultiYearMonthOptions } from '../../domain/formatters';
 import { IconRenderer } from '../../components/ui/IconRenderer';
 import { TransactionModal } from './TransactionModal';
 
@@ -23,13 +23,19 @@ export const TransactionsPage: React.FC = () => {
   const [selectedType, setSelectedType] = useState<TransactionType | 'all'>('all');
   const [selectedWallet, setSelectedWallet] = useState<string>('all');
   const [selectedPillar, setSelectedPillar] = useState<PillarType | 'all'>('all');
+  const [pageMonthFilter, setPageMonthFilter] = useState<string>('GLOBAL');
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const monthGroups = useMemo(() => {
+    return generateMultiYearMonthOptions(selectedMonth);
+  }, [selectedMonth]);
 
   const walletMap = new Map(wallets.map((w) => [w.id, w]));
   const categoryMap = new Map(categories.map((c) => [c.id, c]));
 
   const filteredTransactions = transactions.filter((tx) => {
-    if (selectedMonth && !tx.date.startsWith(selectedMonth)) return false;
+    const activePeriod = pageMonthFilter === 'GLOBAL' ? selectedMonth : pageMonthFilter;
+    if (activePeriod !== 'ALL' && activePeriod && !tx.date.startsWith(activePeriod)) return false;
     if (selectedType !== 'all' && tx.type !== selectedType) return false;
 
     if (selectedWallet !== 'all') {
@@ -102,6 +108,24 @@ export const TransactionsPage: React.FC = () => {
             </button>
           )}
         </div>
+
+        <select
+          value={pageMonthFilter}
+          onChange={(e) => setPageMonthFilter(e.target.value)}
+          className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:border-teal-700 cursor-pointer"
+        >
+          <option value="GLOBAL">Bulan Aktif: {getMonthLabel(selectedMonth)}</option>
+          <option value="ALL">Semua Waktu (Riwayat Lengkap)</option>
+          {monthGroups.map((g) => (
+            <optgroup key={g.year} label={g.label}>
+              {g.options.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
 
         <select
           value={selectedType}
