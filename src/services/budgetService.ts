@@ -4,6 +4,7 @@ import {
   getDocs,
   setDoc,
   updateDoc,
+  deleteDoc,
   writeBatch,
   query,
   orderBy,
@@ -43,6 +44,29 @@ export async function fetchCategories(uid: string): Promise<Category[]> {
     return CLEAN_DEFAULT_CATEGORIES;
   }
 
+  // 1. MIGRATION: Remove cat-shopping (Belanja Online dihapus)
+  const hasShopping = rawCategories.some((c) => c.id === 'cat-shopping');
+  if (hasShopping) {
+    rawCategories = rawCategories.filter((c) => c.id !== 'cat-shopping');
+    if (isFirebaseConfigured && db) {
+      deleteDoc(doc(db, 'users', uid, 'budgets', 'cat-shopping')).catch(() => {});
+    }
+  }
+
+  // 2. MIGRATION: Ensure new categories (cat-vehicle-tax, cat-fashion, cat-skincare) exist
+  const existingIds = new Set(rawCategories.map((c) => c.id));
+  const missingCategories = CLEAN_DEFAULT_CATEGORIES.filter((c) => !existingIds.has(c.id));
+  if (missingCategories.length > 0) {
+    rawCategories = [...rawCategories, ...missingCategories];
+    if (isFirebaseConfigured && db) {
+      const batch = writeBatch(db);
+      missingCategories.forEach((mc) => {
+        batch.set(doc(db, 'users', uid, 'budgets', mc.id), mc);
+      });
+      batch.commit().catch(() => {});
+    }
+  }
+
   // Hydrate with defaults for icons/colors/names without overwriting user's 0 numbers
   return rawCategories.map((c) => {
     const def = defaultsMap.get(c.id);
@@ -53,9 +77,22 @@ export async function fetchCategories(uid: string): Promise<Category[]> {
         ? c.budgetLimit
         : 0;
 
+    let categoryName = c.name || def?.name || 'Kategori';
+    let iconName = c.iconName || def?.iconName || 'Tag';
+
+    // Rename legacy motor service to Service Kendaraan / Armada
+    if (c.id === 'cat-motor-service') {
+      if (!c.name || c.name === 'Service Motor & Perawatan') {
+        categoryName = 'Service Kendaraan / Armada';
+      }
+      iconName = 'Wrench';
+    }
+
     return {
       ...def,
       ...c,
+      name: categoryName,
+      iconName,
       monthlyPlanCap: planCap,
       budgetLimit: planCap,
       budgetMode: c.budgetMode || def?.budgetMode || 'ROUTINE_STRICT_CAP',
@@ -67,7 +104,6 @@ export async function fetchCategories(uid: string): Promise<Category[]> {
       targetDate: c.targetDate ?? def?.targetDate,
       pillar: c.pillar || def?.pillar || 'NEEDS',
       color: c.color || def?.color || '#0D9488',
-      iconName: c.iconName || def?.iconName || 'Tag',
     };
   });
 }
@@ -531,11 +567,12 @@ export async function resetUserDataToZero(uid: string): Promise<void> {
       batch.set(wRef, w);
     });
 
-    // 2. Reset all categories to 0 caps
+    // 2. Reset all categories to 0 caps & delete legacy cat-shopping
     CLEAN_DEFAULT_CATEGORIES.forEach((c) => {
       const cRef = doc(db, 'users', uid, 'budgets', c.id);
       batch.set(cRef, c);
     });
+    batch.delete(doc(db, 'users', uid, 'budgets', 'cat-shopping'));
 
     // 3. Delete all transactions
     const txColRef = collection(db, 'users', uid, 'transactions');

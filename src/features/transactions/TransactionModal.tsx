@@ -52,7 +52,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         setToWalletId(wallets[1].id);
       }
 
-      const expCats = categories.filter((c) => c.budgetLimit > 0);
+      const expCats = categories.filter((c) => !c.id.includes('salary') && !c.id.includes('bonus'));
       if (expCats.length > 0) {
         setCategoryId(expCats[0].id);
         if (expCats[0].budgetMode === 'SINKING_FUND') {
@@ -359,8 +359,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                     </span>
                     <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto pr-1">
                       {categories
-                        .filter((c) => c.budgetLimit > 0)
-                        .slice(0, 8)
+                        .filter((c) => !c.id.includes('salary') && !c.id.includes('bonus'))
+                        .slice(0, 10)
                         .map((cat) => (
                           <button
                             key={cat.id}

@@ -36,6 +36,8 @@ import {
   Search,
   Filter,
   Trash2,
+  Shirt,
+  Wrench,
 } from 'lucide-react';
 
 type IconType = React.ComponentType<{ className?: string; size?: number; strokeWidth?: number }>;
@@ -77,6 +79,8 @@ const ICON_MAP: Record<string, IconType> = {
   Search,
   Filter,
   Trash2,
+  Shirt,
+  Wrench,
 };
 
 interface IconRendererProps {

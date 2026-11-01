@@ -19,10 +19,15 @@ export async function fetchTransactions(uid: string): Promise<Transaction[]> {
     const q = query(colRef, orderBy('date', 'desc'));
     const snap = await getDocs(q);
     if (snap.empty) return [];
-    return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Transaction, 'id'>) }));
+    return snap.docs
+      .map((d) => ({ id: d.id, ...(d.data() as Omit<Transaction, 'id'>) }))
+      .map((t) => (t.categoryId === 'cat-shopping' ? { ...t, categoryId: 'cat-skincare' } : t));
   } else {
     const saved = localStorage.getItem(getTxLocalKey(uid));
-    return saved ? JSON.parse(saved) : DEFAULT_TRANSACTIONS;
+    const list: Transaction[] = saved ? JSON.parse(saved) : DEFAULT_TRANSACTIONS;
+    return list.map((t) =>
+      t.categoryId === 'cat-shopping' ? { ...t, categoryId: 'cat-skincare' } : t
+    );
   }
 }
 
