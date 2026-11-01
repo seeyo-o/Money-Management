@@ -53,39 +53,19 @@ export function calculateCategoryBudgetState(
     accumulatedReserve + (currentAllocated - currentMonthSpent) - vaultSpent
   );
 
-  let allowedSpendingLimit = 0;
-  let spendingProgress = 0;
+  // UNIFIED BUDGET ENGINE:
+  // Every category acts both to cap and control spending and as a savings/rollover allocation.
+  const allowedSpendingLimit = category.monthlyPlanCap || category.budgetLimit || 0;
+
+  const spendingProgress =
+    allowedSpendingLimit > 0 ? (currentMonthSpent / allowedSpendingLimit) * 100 : 0;
+
   let status: 'safe' | 'warning' | 'danger' = 'safe';
-
-  if (category.budgetMode === 'ROUTINE_STRICT_CAP') {
-    // STRICT CAP RULE:
-    // Even if there is 100k leftover from October in reserve,
-    // November's allowed spending limit is STRICTLY LOCKED to monthlyPlanCap (e.g. Rp 500.000)!
-    allowedSpendingLimit = category.monthlyPlanCap || category.budgetLimit || 0;
-
-    spendingProgress =
-      allowedSpendingLimit > 0 ? (currentMonthSpent / allowedSpendingLimit) * 100 : 0;
-
-    if (spendingProgress >= 100) {
-      status = 'danger';
-    } else if (spendingProgress >= 75) {
-      status = 'warning';
-    } else {
-      status = 'safe';
-    }
+  if (spendingProgress >= 100) {
+    status = 'danger';
+  } else if (spendingProgress >= 75) {
+    status = 'warning';
   } else {
-    // SINKING_FUND mode:
-    // e.g. Service Motor. The entire accumulated vault cash is available when needed.
-    allowedSpendingLimit = Math.max(0, accumulatedReserve + currentAllocated - vaultSpent);
-
-    if (category.targetFundAmount && category.targetFundAmount > 0) {
-      // Progress towards savings target
-      spendingProgress = (totalCategoryBackedCash / category.targetFundAmount) * 100;
-    } else {
-      spendingProgress =
-        allowedSpendingLimit > 0 ? (vaultSpent / (allowedSpendingLimit + vaultSpent)) * 100 : 0;
-    }
-
     status = 'safe';
   }
 

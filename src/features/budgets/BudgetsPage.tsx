@@ -11,7 +11,6 @@ import {
   Plus,
   TrendingDown,
   Vault,
-  Calendar,
   Lock,
   Wallet as WalletIcon,
   HelpCircle,
@@ -21,7 +20,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useFinance } from '../../context/FinanceContext';
-import type { PillarType, Category, BudgetMode } from '../../domain/types';
+import type { PillarType, Category } from '../../domain/types';
 import type { AllocationAction } from '../../services/budgetService';
 import { formatIDR, parseSmartAmount } from '../../domain/formatters';
 import { IconRenderer } from '../../components/ui/IconRenderer';
@@ -40,7 +39,6 @@ export const BudgetsPage: React.FC = () => {
     selectedMonth,
   } = useFinance();
 
-  const [activeTab, setActiveTab] = useState<BudgetMode>('ROUTINE_STRICT_CAP');
   const [selectedPillar, setSelectedPillar] = useState<PillarType | 'ALL'>('ALL');
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [newLimitStr, setNewLimitStr] = useState<string>('');
@@ -64,33 +62,10 @@ export const BudgetsPage: React.FC = () => {
     );
   }, [categorySpendings]);
 
-  // Separate routine vs sinking fund categories
-  const routineCategories = useMemo(() => {
-    return budgetableCategories.filter(
-      (c) => (c.budgetMode || 'ROUTINE_STRICT_CAP') === 'ROUTINE_STRICT_CAP'
-    );
-  }, [budgetableCategories]);
-
-  const sinkingFundCategories = useMemo(() => {
-    return budgetableCategories.filter((c) => c.budgetMode === 'SINKING_FUND');
-  }, [budgetableCategories]);
-
-  // Tab categories
-  const tabCategories = activeTab === 'ROUTINE_STRICT_CAP' ? routineCategories : sinkingFundCategories;
-
   const filteredCategories = useMemo(() => {
-    if (selectedPillar === 'ALL') return tabCategories;
-    return tabCategories.filter((c) => c.pillar === selectedPillar);
-  }, [tabCategories, selectedPillar]);
-
-  // Totals for routine
-  const totalRoutineBudget = routineCategories.reduce(
-    (sum, c) => sum + (c.monthlyPlanCap || c.budgetLimit || 0),
-    0
-  );
-  const totalRoutineSpent = routineCategories.reduce((sum, c) => sum + c.currentMonthSpent, 0);
-  const routinePercentage =
-    totalRoutineBudget > 0 ? (totalRoutineSpent / totalRoutineBudget) * 100 : 0;
+    if (selectedPillar === 'ALL') return budgetableCategories;
+    return budgetableCategories.filter((c) => c.pillar === selectedPillar);
+  }, [budgetableCategories, selectedPillar]);
 
   const handleOpenEdit = (c: Category) => {
     setEditingCategory(c);
@@ -121,10 +96,10 @@ export const BudgetsPage: React.FC = () => {
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <h2 className="text-base font-bold text-slate-900 tracking-tight flex items-center gap-2">
-            Perencanaan Anggaran & Sinking Fund
+            Perencanaan Anggaran
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Sistem Dual-Balance: Kuota belanja disiplin ketat & akumulasi brankas cadangan terencana
+            Arsitektur Finansial Rasional: Pembatasan belanja disiplin ketat & akumulasi alokasi per kategori
           </p>
         </div>
 
@@ -198,13 +173,13 @@ export const BudgetsPage: React.FC = () => {
 
           {/* Card 2: Total Locked in Vaults & Budget */}
           <div className="p-3.5 bg-white rounded-xl border border-teal-200/90 shadow-subtle flex flex-col justify-between">
-            <span className="text-[11px] font-medium text-teal-700">Dana Terikat Anggaran & Sinking Fund</span>
+            <span className="text-[11px] font-medium text-teal-700">Dana Terikat Anggaran</span>
             <div className="my-1">
               <span className="text-base font-black text-teal-800 tabular-numbers">
                 {formatIDR(cashAllocation.totalAllocatedVaultLocked)}
               </span>
             </div>
-            <span className="text-[10px] text-teal-600">Locked di brankas cadangan & kuota bulanan</span>
+            <span className="text-[10px] text-teal-600">Locked di kuota alokasi & brankas cadangan</span>
           </div>
 
           {/* Card 3: Unallocated Free Cash */}
@@ -292,46 +267,16 @@ export const BudgetsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. TABS SWITCHER & PILLAR FILTER */}
+      {/* 3. LIST HEADER & PILLAR FILTER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-2">
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setActiveTab('ROUTINE_STRICT_CAP')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition ${
-              activeTab === 'ROUTINE_STRICT_CAP'
-                ? 'bg-slate-900 text-white shadow-sm'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
+          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-900 text-white shadow-sm">
             <ShieldCheck size={15} />
-            <span>Anggaran Rutin (Strict-Cap)</span>
-            <span
-              className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                activeTab === 'ROUTINE_STRICT_CAP' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
-              }`}
-            >
-              {routineCategories.length}
+            <span>Daftar Anggaran & Alokasi</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/20 text-white font-extrabold">
+              {filteredCategories.length}
             </span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('SINKING_FUND')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition ${
-              activeTab === 'SINKING_FUND'
-                ? 'bg-amber-600 text-white shadow-sm'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <Vault size={15} />
-            <span>Tabungan Budget (Sinking Fund)</span>
-            <span
-              className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                activeTab === 'SINKING_FUND' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
-              }`}
-            >
-              {sinkingFundCategories.length}
-            </span>
-          </button>
+          </div>
         </div>
 
         {/* Pillar Filter */}
@@ -352,19 +297,18 @@ export const BudgetsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 4. TAB 1: ANGGARAN RUTIN (STRICT CAP) */}
-      {activeTab === 'ROUTINE_STRICT_CAP' && (
-        <div className="space-y-4">
-          {/* Strict Cap Rule Notice */}
-          <div className="p-3.5 bg-slate-100/90 border border-slate-200/80 rounded-xl text-xs text-slate-700 flex items-start gap-2.5">
-            <Lock size={16} className="text-slate-600 shrink-0 mt-0.5" />
-            <div className="space-y-0.5">
-              <span className="font-bold text-slate-900">Prinsip Disiplin Strict-Cap:</span>
-              <p className="text-[11px] text-slate-600 leading-relaxed">
-                Sisa alokasi bulan lalu otomatis tersimpan di <strong>Brankas Cadangan</strong> dan <strong>TIDAK MENAIKKAN</strong> plafon belanja bulan berjalan (contoh: Makan tetap Rp 2.500.000 meskipun ada sisa Rp 100.000 dari Oktober). Ini melindungi Anda dari inflasi gaya hidup.
-              </p>
-            </div>
+      {/* 4. UNIFIED BUDGET & ALLOCATION CARDS */}
+      <div className="space-y-4">
+        {/* Discipline & Rollover Info Notice */}
+        <div className="p-3.5 bg-slate-100/90 border border-slate-200/80 rounded-xl text-xs text-slate-700 flex items-start gap-2.5">
+          <Lock size={16} className="text-slate-600 shrink-0 mt-0.5" />
+          <div className="space-y-0.5">
+            <span className="font-bold text-slate-900">Prinsip Disiplin Anggaran & Akumulasi:</span>
+            <p className="text-[11px] text-slate-600 leading-relaxed">
+              Setiap kategori bertindak membatasi pengeluaran agar sesuai plafon disiplin, sekaligus sebagai alokasi dana bulanan. Sisa alokasi yang tidak terpakai tersimpan di <strong>Brankas Akumulasi</strong> dan siap digunakan saat dibutuhkan.
+            </p>
           </div>
+        </div>
 
           {/* Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch">
@@ -509,7 +453,9 @@ export const BudgetsPage: React.FC = () => {
                       <span className="text-xs font-extrabold text-teal-800 tabular-numbers block">
                         {formatIDR(cat.accumulatedVaultReserve || 0)}
                       </span>
-                      <span className="text-[9px] text-slate-400">Sisa Rollover</span>
+                      <span className="text-[10px] text-slate-500 font-medium">
+                        Total Kas: <strong className="text-slate-700">{formatIDR(cat.totalCategoryBackedCash)}</strong>
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -517,131 +463,6 @@ export const BudgetsPage: React.FC = () => {
             })}
           </div>
         </div>
-      )}
-
-      {/* 5. TAB 2: TABUNGAN BUDGET (SINKING FUND) */}
-      {activeTab === 'SINKING_FUND' && (
-        <div className="space-y-4">
-          {/* Sinking Fund Notice */}
-          <div className="p-3.5 bg-amber-50/80 border border-amber-200/80 rounded-xl text-xs text-amber-950 flex items-start gap-2.5">
-            <Vault size={16} className="text-amber-700 shrink-0 mt-0.5" />
-            <div className="space-y-0.5">
-              <span className="font-bold text-amber-900">Konsep Sinking Fund (Tabungan Terencana):</span>
-              <p className="text-[11px] text-amber-800 leading-relaxed">
-                Tabungan budget disisihkan secara disiplin setiap bulan (contoh: Service Motor Rp 100.000/bulan) untuk kebutuhan mendatang (target Rp 1.200.000 pada Okt 2027). Ketika service tiba, pembayaran diambil langsung dari brankas tanpa memotong kuota belanja harian.
-              </p>
-            </div>
-          </div>
-
-          {/* Sinking Fund Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch">
-            {filteredCategories.map((fund) => {
-              const target = fund.targetFundAmount || 1;
-              const currentTotal = fund.totalCategoryBackedCash;
-              const progressPct = Math.min(100, Math.max(0, (currentTotal / target) * 100));
-
-              return (
-                <div
-                  key={fund.id}
-                  className="bento-card p-5 rounded-2xl flex flex-col justify-between bg-white border border-amber-200/90 shadow-subtle hover:border-amber-300 hover:shadow-card transition-all"
-                >
-                  <div>
-                    {/* Header */}
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div
-                          className="w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 shadow-xs"
-                          style={{ backgroundColor: fund.color }}
-                        >
-                          <IconRenderer name={fund.iconName} size={18} />
-                        </div>
-                        <div className="min-w-0">
-                          <h3 className="text-xs font-bold text-slate-900 truncate leading-snug">
-                            {fund.name}
-                          </h3>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="text-[9px] font-extrabold text-amber-800 bg-amber-100/80 border border-amber-200 px-2 py-0.5 rounded-md uppercase tracking-wider">
-                              Sinking Fund
-                            </span>
-                            <span className="text-[11px] text-slate-400 font-medium">
-                              • Setoran: {formatIDR(fund.monthlyPlanCap)}/bln
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => openAllocateFor(fund.id, 'SET_TOTAL')}
-                        className="p-1.5 rounded-lg text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200/60 transition shrink-0"
-                        title="Kelola Tabungan Sinking Fund (Setor / Tarik / Koreksi)"
-                      >
-                        <Plus size={15} />
-                      </button>
-                    </div>
-
-                    {/* Total Brankas Ready to Spend */}
-                    <div className="p-3.5 bg-gradient-to-br from-amber-50/80 to-amber-100/40 border border-amber-200/70 rounded-xl space-y-2 mt-2">
-                      <div className="flex items-baseline justify-between">
-                        <span className="text-[11px] font-semibold text-amber-900">
-                          Dana Terkumpul di Brankas:
-                        </span>
-                        <span className="text-sm font-black text-amber-950 tabular-numbers">
-                          {formatIDR(currentTotal)}
-                        </span>
-                      </div>
-
-                      {/* Progress Bar towards Target */}
-                      <div className="w-full h-2 bg-amber-200/60 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-amber-600 rounded-full transition-all duration-500"
-                          style={{ width: `${progressPct}%` }}
-                        ></div>
-                      </div>
-
-                      <div className="flex items-center justify-between text-[11px] text-amber-800 font-medium pt-0.5">
-                        <span>Target: {formatIDR(fund.targetFundAmount || 0)}</span>
-                        <span className="font-bold tabular-numbers">{progressPct.toFixed(0)}% Tercapai</span>
-                      </div>
-                    </div>
-
-                    {/* Meta details */}
-                    <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
-                      <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl">
-                        <span className="text-[10px] text-slate-400 block font-medium">Alokasi Bulan Ini:</span>
-                        <span className="font-bold text-slate-800 tabular-numbers">
-                          {formatIDR(fund.currentMonthAllocated || fund.monthlyPlanCap)}
-                        </span>
-                      </div>
-                      <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl">
-                        <span className="text-[10px] text-slate-400 block font-medium">Target Waktu:</span>
-                        <span className="font-bold text-slate-800 flex items-center gap-1">
-                          <Calendar size={12} className="text-amber-600" />
-                          {fund.targetDate || 'Fleksibel'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Footer: Action to deposit */}
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-                    <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                      <Lock size={11} className="text-teal-600" />
-                      Pengeluaran langsung potong brankas
-                    </span>
-                    <button
-                      onClick={() => openAllocateFor(fund.id, 'SET_TOTAL')}
-                      className="text-xs font-bold text-teal-700 hover:text-teal-900 flex items-center gap-1"
-                    >
-                      <span>Kelola Tabungan</span>
-                      <span className="text-sm font-semibold">&rarr;</span>
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {/* 6. RIWAYAT AUDIT REALOKASI DARURAT (WORST-CASE AUDIT TRAIL) */}
       {emergencyLogs.length > 0 && (
@@ -729,8 +550,8 @@ export const BudgetsPage: React.FC = () => {
                 </div>
                 <div>
                   <h4 className="text-xs font-bold text-slate-800">{editingCategory.name}</h4>
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold">
-                    Mode: {editingCategory.budgetMode === 'SINKING_FUND' ? 'Sinking Fund' : 'Strict Cap'}
+                  <span className="text-[10px] text-slate-500 uppercase font-semibold">
+                    Pilar: {editingCategory.pillar}
                   </span>
                 </div>
               </div>

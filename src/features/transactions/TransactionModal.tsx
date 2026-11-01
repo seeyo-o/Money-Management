@@ -55,9 +55,6 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       const expCats = categories.filter((c) => !c.id.includes('salary') && !c.id.includes('bonus'));
       if (expCats.length > 0) {
         setCategoryId(expCats[0].id);
-        if (expCats[0].budgetMode === 'SINKING_FUND') {
-          setIsVaultSpend(true);
-        }
       }
     }
   }, [isOpen, defaultType, defaultWalletId, wallets, categories]);
@@ -66,12 +63,6 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
   const handleSelectCategory = (id: string) => {
     setCategoryId(id);
-    const cat = categories.find((c) => c.id === id);
-    if (cat?.budgetMode === 'SINKING_FUND') {
-      setIsVaultSpend(true);
-    } else {
-      setIsVaultSpend(false);
-    }
   };
 
   const availableCategories =
@@ -344,7 +335,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                   >
                     {availableCategories.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.name} ({c.pillar}) {c.budgetMode === 'SINKING_FUND' ? '• Sinking Fund' : ''}
+                        {c.name} ({c.pillar})
                       </option>
                     ))}
                   </select>
@@ -379,7 +370,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Sinking Fund / Vault Spend Toggle */}
+                  {/* Vault Spend Toggle */}
                   <div
                     className={`p-3 rounded-xl border text-xs transition ${
                       isVaultSpend
@@ -397,12 +388,10 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                       <div>
                         <span className="font-bold flex items-center gap-1.5 text-slate-900">
                           <Vault size={14} className={isVaultSpend ? 'text-amber-600' : 'text-slate-400'} />
-                          Gunakan Dana Tabungan Budget (Spend from Sinking Fund Vault)
+                          Gunakan Saldo Cadangan Brankas (Spend from Vault Reserve)
                         </span>
                         <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                          {categories.find((c) => c.id === categoryId)?.budgetMode === 'SINKING_FUND'
-                            ? `Pengeluaran ini akan dipotong langsung dari brankas tabungan akumulasi, BUKAN dari kuota belanja bulanan rutin.`
-                            : `Potong biaya ini dari saldo cadangan brankas akumulasi tanpa mengurangi sisa plafon belanja bulanan.`}
+                          Potong transaksi ini langsung dari saldo cadangan brankas akumulasi tanpa memotong kuota batas belanja bulanan.
                         </p>
                       </div>
                     </label>

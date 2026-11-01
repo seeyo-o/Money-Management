@@ -98,13 +98,13 @@ export async function fetchCategories(uid: string): Promise<Category[]> {
       iconName,
       monthlyPlanCap: planCap,
       budgetLimit: planCap,
-      budgetMode: c.budgetMode || def?.budgetMode || 'ROUTINE_STRICT_CAP',
+      budgetMode: 'ROUTINE_STRICT_CAP',
       accumulatedVaultReserve:
         c.accumulatedVaultReserve !== undefined ? c.accumulatedVaultReserve : 0,
       currentMonthAllocated:
         c.currentMonthAllocated !== undefined ? c.currentMonthAllocated : planCap,
-      targetFundAmount: c.targetFundAmount !== undefined ? c.targetFundAmount : 0,
-      targetDate: c.targetDate ?? def?.targetDate,
+      targetFundAmount: 0,
+      targetDate: null,
       pillar: c.pillar || def?.pillar || 'NEEDS',
       color: c.color || def?.color || '#0D9488',
     };

@@ -215,7 +215,7 @@ export const AllocateBudgetModal: React.FC<AllocateBudgetModalProps> = ({
             >
               {allCategories.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name} ({c.budgetMode === 'SINKING_FUND' ? 'Sinking Fund' : 'Rutin'}) - Alokasi: {formatIDR(c.currentMonthAllocated || 0)} | Plafon: {formatIDR(c.monthlyPlanCap || c.budgetLimit || 0)}
+                  {c.name} ({c.pillar}) - Alokasi: {formatIDR(c.currentMonthAllocated || 0)} | Plafon: {formatIDR(c.monthlyPlanCap || c.budgetLimit || 0)}
                 </option>
               ))}
             </select>
@@ -235,7 +235,7 @@ export const AllocateBudgetModal: React.FC<AllocateBudgetModalProps> = ({
                   <span>{currentCategory.name}</span>
                 </div>
                 <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase bg-white border border-slate-200 text-slate-700">
-                  {currentCategory.budgetMode === 'SINKING_FUND' ? 'Sinking Fund' : 'Strict Cap Rutin'}
+                  {currentCategory.pillar}
                 </span>
               </div>
 

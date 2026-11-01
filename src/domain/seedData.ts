@@ -125,21 +125,19 @@ export const DEFAULT_CATEGORIES: Category[] = [
     lastRolloverPeriod: '2026-09',
   },
 
-  // Sinking Fund Khusus (Tabungan Budget Berjangka) - SINKING_FUND
+  // Anggaran Khusus / Tabungan Alokasi - ROUTINE_STRICT_CAP
   {
     id: 'cat-motor-service',
     name: 'Service Kendaraan / Armada',
     pillar: 'NEEDS',
     iconName: 'Wrench',
     color: '#EA580C',
-    budgetMode: 'SINKING_FUND',
-    monthlyPlanCap: 100000, // Setoran rutin 100k/bulan
-    accumulatedVaultReserve: 300000, // Terkumpul 3 bulan (Okt, Nov, Des / akumulasi)
-    currentMonthAllocated: 100000,
-    targetFundAmount: 1200000, // Target untuk service besar berkala
-    targetDate: '2027-10',
+    budgetMode: 'ROUTINE_STRICT_CAP',
+    monthlyPlanCap: 200000,
+    accumulatedVaultReserve: 300000,
+    currentMonthAllocated: 200000,
     linkedPreferredWalletId: 'w-bca',
-    budgetLimit: 100000,
+    budgetLimit: 200000,
     lastRolloverPeriod: '2026-09',
   },
   {
@@ -148,12 +146,10 @@ export const DEFAULT_CATEGORIES: Category[] = [
     pillar: 'NEEDS',
     iconName: 'Receipt',
     color: '#D97706',
-    budgetMode: 'SINKING_FUND',
-    monthlyPlanCap: 150000, // Cicilan tabungan pajak tahunan 150k/bulan
+    budgetMode: 'ROUTINE_STRICT_CAP',
+    monthlyPlanCap: 150000,
     accumulatedVaultReserve: 450000,
     currentMonthAllocated: 150000,
-    targetFundAmount: 1800000, // Estimasi PKB/STNK tahunan
-    targetDate: '2027-05',
     linkedPreferredWalletId: 'w-bca',
     budgetLimit: 150000,
     lastRolloverPeriod: '2026-09',
@@ -226,19 +222,17 @@ export const DEFAULT_CATEGORIES: Category[] = [
     lastRolloverPeriod: '2026-09',
   },
 
-  // Savings (20%) - SINKING_FUND / SAVINGS
+  // Savings (20%) - ROUTINE_STRICT_CAP
   {
     id: 'cat-emergency',
     name: 'Tabungan Dana Darurat',
     pillar: 'SAVINGS',
     iconName: 'ShieldCheck',
     color: '#10B981',
-    budgetMode: 'SINKING_FUND',
+    budgetMode: 'ROUTINE_STRICT_CAP',
     monthlyPlanCap: 3000000,
     accumulatedVaultReserve: 15000000,
     currentMonthAllocated: 3000000,
-    targetFundAmount: 30000000,
-    targetDate: '2027-12',
     linkedPreferredWalletId: 'w-bca',
     budgetLimit: 3000000,
     lastRolloverPeriod: '2026-09',
@@ -249,12 +243,10 @@ export const DEFAULT_CATEGORIES: Category[] = [
     pillar: 'SAVINGS',
     iconName: 'TrendingUp',
     color: '#059669',
-    budgetMode: 'SINKING_FUND',
+    budgetMode: 'ROUTINE_STRICT_CAP',
     monthlyPlanCap: 2500000,
     accumulatedVaultReserve: 10000000,
     currentMonthAllocated: 2500000,
-    targetFundAmount: 50000000,
-    targetDate: '2028-12',
     linkedPreferredWalletId: 'w-cimb',
     budgetLimit: 2500000,
     lastRolloverPeriod: '2026-09',
