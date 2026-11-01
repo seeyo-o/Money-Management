@@ -13,6 +13,8 @@ import {
   ArrowDown,
   ArrowUp,
   Vault,
+  RotateCcw,
+  AlertTriangle,
 } from 'lucide-react';
 import { useFinance } from '../../context/FinanceContext';
 import type { Wallet, WalletCategory } from '../../domain/types';
@@ -20,11 +22,22 @@ import { formatIDR } from '../../domain/formatters';
 import { SmartCurrencyInput } from '../../components/ui/SmartCurrencyInput';
 
 export const WalletsPage: React.FC = () => {
-  const { wallets, transactions, selectedMonth, addWallet, reconcileWallet, cashAllocation } = useFinance();
+  const {
+    wallets,
+    transactions,
+    selectedMonth,
+    addWallet,
+    reconcileWallet,
+    cashAllocation,
+    resetAllDataToZero,
+  } = useFinance();
 
   const [reconcilingWallet, setReconcilingWallet] = useState<Wallet | null>(null);
   const [actualBalance, setActualBalance] = useState<number>(0);
   const [reconcileNote, setReconcileNote] = useState<string>('');
+
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newWalletName, setNewWalletName] = useState('');
@@ -100,6 +113,18 @@ export const WalletsPage: React.FC = () => {
     setNewWalletName('');
     setNewWalletNumber('');
     setNewWalletInitialBalance(0);
+  };
+
+  const handleResetToZero = async () => {
+    setIsResetting(true);
+    try {
+      await resetAllDataToZero();
+      setIsResetConfirmOpen(false);
+    } catch (err) {
+      console.error('Reset failed:', err);
+    } finally {
+      setIsResetting(false);
+    }
   };
 
   const renderWalletCard = (w: Wallet) => {
@@ -200,13 +225,24 @@ export const WalletsPage: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => setIsAddOpen(true)}
-          className="flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold shadow-sm self-start sm:self-auto transition"
-        >
-          <Plus size={15} className="text-teal-400" />
-          <span>Tambah Akun / Dompet</span>
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <button
+            onClick={() => setIsResetConfirmOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-rose-50 text-slate-600 hover:text-rose-700 border border-slate-200 hover:border-rose-200 rounded-xl text-xs font-semibold shadow-subtle transition"
+            title="Kosongkan seluruh saldo, transaksi, dan budget ke nol"
+          >
+            <RotateCcw size={14} />
+            <span>Kosongkan & Mulai dari Nol</span>
+          </button>
+
+          <button
+            onClick={() => setIsAddOpen(true)}
+            className="flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold shadow-sm transition"
+          >
+            <Plus size={15} className="text-teal-400" />
+            <span>Tambah Akun / Dompet</span>
+          </button>
+        </div>
       </div>
 
       {/* Dual-Balance Cash Allocation Summary */}
@@ -534,6 +570,44 @@ export const WalletsPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Confirmation Modal */}
+      {isResetConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
+          <div className="relative w-full max-w-md bg-white rounded-2xl shadow-modal border border-slate-200 p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 border border-rose-200">
+                <AlertTriangle size={20} />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Kosongkan Semua Data ke Nol?</h3>
+                <p className="text-xs text-slate-500">Mulai pembukuan fresh dari awal</p>
+              </div>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+              Tindakan ini akan mengosongkan seluruh saldo dompet ke <strong>Rp 0</strong>, menghapus seluruh riwayat transaksi, dan mereset plafon budget ke <strong>Rp 0</strong> sehingga Anda bisa mengisi data riil Anda sendiri dari awal secara manual.
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsResetConfirmOpen(false)}
+                disabled={isResetting}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleResetToZero}
+                disabled={isResetting}
+                className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-sm transition disabled:opacity-50"
+              >
+                {isResetting ? 'Mengosongkan...' : 'Ya, Kosongkan Semua Data'}
+              </button>
+            </div>
           </div>
         </div>
       )}

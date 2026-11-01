@@ -15,6 +15,8 @@ import {
   DEFAULT_WALLETS,
   DEFAULT_TRANSACTIONS,
   DEFAULT_BUDGET_LEDGER,
+  CLEAN_DEFAULT_WALLETS,
+  CLEAN_DEFAULT_CATEGORIES,
 } from '../domain/seedData';
 
 const getCatLocalKey = (uid: string) => `rasio_categories_${uid}`;
@@ -38,18 +40,18 @@ export async function fetchCategories(uid: string): Promise<Category[]> {
   }
 
   if (rawCategories.length === 0) {
-    return DEFAULT_CATEGORIES;
+    return CLEAN_DEFAULT_CATEGORIES;
   }
 
-  // Hydrate with defaults if any category missing monthlyPlanCap or budgetMode
+  // Hydrate with defaults for icons/colors/names without overwriting user's 0 numbers
   return rawCategories.map((c) => {
     const def = defaultsMap.get(c.id);
     const planCap =
-      c.monthlyPlanCap !== undefined && c.monthlyPlanCap > 0
+      c.monthlyPlanCap !== undefined
         ? c.monthlyPlanCap
-        : c.budgetLimit !== undefined && c.budgetLimit > 0
+        : c.budgetLimit !== undefined
         ? c.budgetLimit
-        : def?.monthlyPlanCap || def?.budgetLimit || 0;
+        : 0;
 
     return {
       ...def,
@@ -58,12 +60,10 @@ export async function fetchCategories(uid: string): Promise<Category[]> {
       budgetLimit: planCap,
       budgetMode: c.budgetMode || def?.budgetMode || 'ROUTINE_STRICT_CAP',
       accumulatedVaultReserve:
-        c.accumulatedVaultReserve !== undefined ? c.accumulatedVaultReserve : (def?.accumulatedVaultReserve ?? 0),
+        c.accumulatedVaultReserve !== undefined ? c.accumulatedVaultReserve : 0,
       currentMonthAllocated:
-        c.currentMonthAllocated !== undefined && c.currentMonthAllocated > 0
-          ? c.currentMonthAllocated
-          : (def?.currentMonthAllocated ?? planCap),
-      targetFundAmount: c.targetFundAmount ?? def?.targetFundAmount,
+        c.currentMonthAllocated !== undefined ? c.currentMonthAllocated : planCap,
+      targetFundAmount: c.targetFundAmount !== undefined ? c.targetFundAmount : 0,
       targetDate: c.targetDate ?? def?.targetDate,
       pillar: c.pillar || def?.pillar || 'NEEDS',
       color: c.color || def?.color || '#0D9488',
@@ -369,11 +369,20 @@ export async function emergencyReallocate(
 
 /**
  * AUTO-ONBOARDING SEED:
- * Automatically initializes standard Indonesian accounts, categories, and seed data for new users.
+ * Initializes empty zero-slate accounts and categories for regular users,
+ * or full demo accounts specifically for demo.user@rasio.id.
  */
-export async function initializeUserDataIfEmpty(uid: string): Promise<{
-  walletsInitialized: boolean;
-}> {
+export async function initializeUserDataIfEmpty(
+  uid: string,
+  userEmail?: string | null
+): Promise<{ walletsInitialized: boolean }> {
+  const isDemo = userEmail === 'demo.user@rasio.id';
+
+  const walletsToSeed = isDemo ? DEFAULT_WALLETS : CLEAN_DEFAULT_WALLETS;
+  const categoriesToSeed = isDemo ? DEFAULT_CATEGORIES : CLEAN_DEFAULT_CATEGORIES;
+  const txsToSeed = isDemo ? DEFAULT_TRANSACTIONS : [];
+  const ledgerToSeed = isDemo ? DEFAULT_BUDGET_LEDGER : [];
+
   if (isFirebaseConfigured && db) {
     const walletColRef = collection(db, 'users', uid, 'wallets');
     const snap = await getDocs(walletColRef);
@@ -381,22 +390,22 @@ export async function initializeUserDataIfEmpty(uid: string): Promise<{
     if (snap.empty) {
       const batch = writeBatch(db);
 
-      DEFAULT_WALLETS.forEach((w) => {
+      walletsToSeed.forEach((w) => {
         const wRef = doc(db, 'users', uid, 'wallets', w.id);
         batch.set(wRef, w);
       });
 
-      DEFAULT_CATEGORIES.forEach((c) => {
+      categoriesToSeed.forEach((c) => {
         const cRef = doc(db, 'users', uid, 'budgets', c.id);
         batch.set(cRef, c);
       });
 
-      DEFAULT_TRANSACTIONS.forEach((tx) => {
+      txsToSeed.forEach((tx) => {
         const tRef = doc(db, 'users', uid, 'transactions', tx.id);
         batch.set(tRef, tx);
       });
 
-      DEFAULT_BUDGET_LEDGER.forEach((bl) => {
+      ledgerToSeed.forEach((bl) => {
         const blRef = doc(db, 'users', uid, 'budget_ledger', bl.id);
         batch.set(blRef, bl);
       });
@@ -408,12 +417,55 @@ export async function initializeUserDataIfEmpty(uid: string): Promise<{
   } else {
     const existing = localStorage.getItem(`rasio_wallets_${uid}`);
     if (!existing) {
-      localStorage.setItem(`rasio_wallets_${uid}`, JSON.stringify(DEFAULT_WALLETS));
-      localStorage.setItem(`rasio_categories_${uid}`, JSON.stringify(DEFAULT_CATEGORIES));
-      localStorage.setItem(`rasio_tx_${uid}`, JSON.stringify(DEFAULT_TRANSACTIONS));
-      localStorage.setItem(`rasio_budget_ledger_${uid}`, JSON.stringify(DEFAULT_BUDGET_LEDGER));
+      localStorage.setItem(`rasio_wallets_${uid}`, JSON.stringify(walletsToSeed));
+      localStorage.setItem(`rasio_categories_${uid}`, JSON.stringify(categoriesToSeed));
+      localStorage.setItem(`rasio_tx_${uid}`, JSON.stringify(txsToSeed));
+      localStorage.setItem(`rasio_budget_ledger_${uid}`, JSON.stringify(ledgerToSeed));
       return { walletsInitialized: true };
     }
     return { walletsInitialized: false };
+  }
+}
+
+/**
+ * RESET ALL DATA TO ZERO:
+ * Resets all wallets to Rp 0, clears all transactions, resets all budget limits to Rp 0.
+ */
+export async function resetUserDataToZero(uid: string): Promise<void> {
+  if (isFirebaseConfigured && db) {
+    const batch = writeBatch(db);
+
+    // 1. Reset all wallets to balance 0
+    CLEAN_DEFAULT_WALLETS.forEach((w) => {
+      const wRef = doc(db, 'users', uid, 'wallets', w.id);
+      batch.set(wRef, w);
+    });
+
+    // 2. Reset all categories to 0 caps
+    CLEAN_DEFAULT_CATEGORIES.forEach((c) => {
+      const cRef = doc(db, 'users', uid, 'budgets', c.id);
+      batch.set(cRef, c);
+    });
+
+    // 3. Delete all transactions
+    const txColRef = collection(db, 'users', uid, 'transactions');
+    const txSnap = await getDocs(txColRef);
+    txSnap.docs.forEach((d) => {
+      batch.delete(d.ref);
+    });
+
+    // 4. Delete all budget ledger entries
+    const ledgerColRef = collection(db, 'users', uid, 'budget_ledger');
+    const ledgerSnap = await getDocs(ledgerColRef);
+    ledgerSnap.docs.forEach((d) => {
+      batch.delete(d.ref);
+    });
+
+    await batch.commit();
+  } else {
+    localStorage.setItem(`rasio_wallets_${uid}`, JSON.stringify(CLEAN_DEFAULT_WALLETS));
+    localStorage.setItem(`rasio_categories_${uid}`, JSON.stringify(CLEAN_DEFAULT_CATEGORIES));
+    localStorage.setItem(`rasio_tx_${uid}`, JSON.stringify([]));
+    localStorage.setItem(`rasio_budget_ledger_${uid}`, JSON.stringify([]));
   }
 }

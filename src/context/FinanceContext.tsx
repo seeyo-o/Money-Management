@@ -26,6 +26,7 @@ import {
   emergencyReallocate as apiEmergencyReallocate,
   fetchBudgetLedger as apiFetchBudgetLedger,
   initializeUserDataIfEmpty,
+  resetUserDataToZero,
 } from '../services/budgetService';
 import {
   calculateMonthSummary,
@@ -66,6 +67,7 @@ interface FinanceContextType {
     amount: number,
     reason: string
   ) => Promise<void>;
+  resetAllDataToZero: () => Promise<void>;
   refreshData: () => Promise<void>;
 }
 
@@ -98,14 +100,33 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     setIsLoading(true);
     try {
-      await initializeUserDataIfEmpty(user.uid);
+      await initializeUserDataIfEmpty(user.uid, user.email);
 
-      const [wList, cList, tList, blList] = await Promise.all([
+      let [wList, cList, tList, blList] = await Promise.all([
         fetchWallets(user.uid),
         fetchCategories(user.uid),
         fetchTransactions(user.uid),
         apiFetchBudgetLedger(user.uid),
       ]);
+
+      // AUTO-CLEANUP FOR REAL REGISTERED USERS:
+      // If user is not demo.user@rasio.id, but has demo transactions or demo seed balances
+      // (from earlier signups before clean slate was enabled), reset to clean zero slate.
+      const isDemo = user.email === 'demo.user@rasio.id';
+      const hasDemoData =
+        tList.some((t) => t.id === 'tx-01' || t.id === 'tx-02') ||
+        wList.some((w) => w.id === 'w-bca' && w.balance === 24500000);
+
+      if (!isDemo && hasDemoData) {
+        console.log('Real registered user detected with demo seed data. Resetting to clean zero state...');
+        await resetUserDataToZero(user.uid);
+        [wList, cList, tList, blList] = await Promise.all([
+          fetchWallets(user.uid),
+          fetchCategories(user.uid),
+          fetchTransactions(user.uid),
+          apiFetchBudgetLedger(user.uid),
+        ]);
+      }
 
       setWallets(wList);
       setCategories(cList);
@@ -290,6 +311,19 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setBudgetLedger((prev) => [ledgerEntry, ...prev]);
   };
 
+  const resetAllDataToZero = async () => {
+    if (!user) return;
+    setIsLoading(true);
+    try {
+      await resetUserDataToZero(user.uid);
+      await loadData();
+    } catch (err) {
+      console.error('Failed to reset user data:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <FinanceContext.Provider
       value={{
@@ -319,6 +353,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         allocateBudget,
         triggerMonthEndRollover,
         performEmergencyReallocation,
+        resetAllDataToZero,
         refreshData: loadData,
       }}
     >

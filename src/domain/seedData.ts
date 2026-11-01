@@ -535,3 +535,19 @@ export const DEFAULT_BUDGET_LEDGER: BudgetLedgerEntry[] = [
     note: 'Akumulasi sisa belanja bulan lalu masuk ke brankas cadangan (Vault)',
   },
 ];
+
+// Clean Zero-Slate Seed for Real Registered Users
+export const CLEAN_DEFAULT_WALLETS: Wallet[] = DEFAULT_WALLETS.map((w) => ({
+  ...w,
+  balance: 0,
+}));
+
+export const CLEAN_DEFAULT_CATEGORIES: Category[] = DEFAULT_CATEGORIES.map((c) => ({
+  ...c,
+  monthlyPlanCap: 0,
+  budgetLimit: 0,
+  accumulatedVaultReserve: 0,
+  currentMonthAllocated: 0,
+  targetFundAmount: 0,
+}));
+
