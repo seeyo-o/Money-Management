@@ -29,6 +29,8 @@ import {
   fetchBudgetLedger as apiFetchBudgetLedger,
   initializeUserDataIfEmpty,
   resetUserDataToZero,
+  exportAllUserDataJSON,
+  importAllUserDataJSON,
 } from '../services/budgetService';
 import {
   calculateMonthSummary,
@@ -78,6 +80,12 @@ interface FinanceContextType {
   ) => Promise<void>;
   resetAllDataToZero: () => Promise<void>;
   refreshData: () => Promise<void>;
+  exportDataJSON: () => Promise<string>;
+  importDataJSON: (jsonString: string) => Promise<{
+    success: boolean;
+    error?: string;
+    stats?: { wallets: number; categories: number; transactions: number };
+  }>;
 }
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
@@ -122,9 +130,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       // If user is not demo.user@rasio.id, but has demo transactions or demo seed balances
       // (from earlier signups before clean slate was enabled), reset to clean zero slate.
       const isDemo = user.email === 'demo.user@rasio.id';
-      const hasDemoData =
-        tList.some((t) => t.id === 'tx-01' || t.id === 'tx-02') ||
-        wList.some((w) => w.id === 'w-bca' && w.balance === 24500000);
+      const hasDemoData = tList.some((t) => t.id === 'tx-01' || t.id === 'tx-02');
 
       if (!isDemo && hasDemoData) {
         console.log('Real registered user detected with demo seed data. Resetting to clean zero state...');
@@ -358,6 +364,31 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  const exportDataJSON = async (): Promise<string> => {
+    if (!user) throw new Error('Pengguna belum masuk.');
+    return exportAllUserDataJSON(user.uid, user.email);
+  };
+
+  const importDataJSON = async (
+    jsonString: string
+  ): Promise<{
+    success: boolean;
+    error?: string;
+    stats?: { wallets: number; categories: number; transactions: number };
+  }> => {
+    if (!user) return { success: false, error: 'Pengguna belum masuk.' };
+    setIsLoading(true);
+    try {
+      const res = await importAllUserDataJSON(user.uid, jsonString);
+      if (res.success) {
+        await loadData();
+      }
+      return res;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <FinanceContext.Provider
       value={{
@@ -390,6 +421,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         performEmergencyReallocation,
         resetAllDataToZero,
         refreshData: loadData,
+        exportDataJSON,
+        importDataJSON,
       }}
     >
       {children}

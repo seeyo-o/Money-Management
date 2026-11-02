@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Landmark, Smartphone, Banknote, LogOut } from 'lucide-react';
+import { Plus, Landmark, Smartphone, Banknote, LogOut, Cloud, HardDrive } from 'lucide-react';
 import { useFinance } from '../../context/FinanceContext';
 import { useAuth } from '../../context/AuthContext';
 import { formatIDR } from '../../domain/formatters';
@@ -7,10 +7,11 @@ import { MonthPicker } from '../ui/MonthPicker';
 
 interface HeaderProps {
   onOpenAddModal: () => void;
+  onOpenCloudSync?: () => void;
   pageTitle: string;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onOpenAddModal, pageTitle }) => {
+export const Header: React.FC<HeaderProps> = ({ onOpenAddModal, onOpenCloudSync, pageTitle }) => {
   const {
     selectedMonth,
     setSelectedMonth,
@@ -19,7 +20,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAddModal, pageTitle }) => 
     totalCashBalance,
     netWorth,
   } = useFinance();
-  const { logout, user } = useAuth();
+  const { logout, user, isFirebaseLive } = useAuth();
 
   return (
     <header className="sticky top-0 z-30 bg-[#F8FAFC]/90 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-6 lg:px-8 py-3.5 transition-all">
@@ -86,6 +87,20 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAddModal, pageTitle }) => 
 
         {/* Right: Month Selector & Quick Add Button */}
         <div className="flex items-center gap-2 self-end sm:self-auto">
+          {/* Cloud Sync Status Icon */}
+          <button
+            type="button"
+            onClick={onOpenCloudSync}
+            className={`p-2 rounded-xl border transition ${
+              isFirebaseLive
+                ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-200'
+                : 'text-amber-700 bg-amber-50 hover:bg-amber-100 border-amber-200 animate-pulse'
+            }`}
+            title={isFirebaseLive ? 'Cloud Firestore Terhubung' : 'Demo Storage (Klik untuk panduan sinkronisasi)'}
+          >
+            {isFirebaseLive ? <Cloud size={15} /> : <HardDrive size={15} />}
+          </button>
+
           {/* Elegant Month & Year Picker */}
           <MonthPicker
             value={selectedMonth}

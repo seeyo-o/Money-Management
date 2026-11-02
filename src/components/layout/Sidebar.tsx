@@ -13,7 +13,11 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
-export const Sidebar: React.FC = () => {
+interface SidebarProps {
+  onOpenCloudSync?: () => void;
+}
+
+export const Sidebar: React.FC<SidebarProps> = ({ onOpenCloudSync }) => {
   const { user, logout, isFirebaseLive } = useAuth();
 
   const navItems = [
@@ -93,16 +97,21 @@ export const Sidebar: React.FC = () => {
       {/* User Session & Status */}
       <div className="p-4 border-t border-slate-100 bg-slate-50/50 space-y-3">
         {/* Cloud Status */}
-        <div className="flex items-center justify-between text-[11px] px-2 py-1 bg-white border border-slate-200/80 rounded-lg">
-          <span className="text-slate-500 font-medium flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={onOpenCloudSync}
+          className="w-full flex items-center justify-between text-[11px] px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200/80 rounded-xl transition cursor-pointer text-left group"
+          title="Klik untuk melihat panduan sinkronisasi Cloud & status koneksi"
+        >
+          <span className="text-slate-600 font-semibold flex items-center gap-1.5">
             {isFirebaseLive ? (
               <>
-                <Cloud size={13} className="text-emerald-500" />
+                <Cloud size={14} className="text-emerald-500" />
                 <span>Cloud Firestore</span>
               </>
             ) : (
               <>
-                <HardDrive size={13} className="text-amber-500" />
+                <HardDrive size={14} className="text-amber-500" />
                 <span>Demo Storage</span>
               </>
             )}
@@ -112,7 +121,7 @@ export const Sidebar: React.FC = () => {
               isFirebaseLive ? 'bg-emerald-500' : 'bg-amber-500'
             }`}
           ></span>
-        </div>
+        </button>
 
         {/* User Card */}
         <div className="flex items-center justify-between gap-2">

@@ -10,7 +10,9 @@ import {
   orderBy,
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../config/firebase';
-import type { Category, BudgetLedgerEntry, Transaction } from '../domain/types';
+import type { Category, BudgetLedgerEntry, Transaction, Wallet } from '../domain/types';
+import { fetchWallets } from './walletService';
+import { fetchTransactions } from './transactionService';
 import {
   DEFAULT_CATEGORIES,
   DEFAULT_WALLETS,
@@ -497,6 +499,106 @@ export async function emergencyReallocate(
 }
 
 /**
+ * AUTO-MIGRATE OFFLINE LOCALSTORAGE DATA TO CLOUD FIRESTORE:
+ * If a user used the app while in offline/demo storage mode on their laptop,
+ * and later connects Firebase, this migrates their saved local data directly into Cloud Firestore
+ * so they don't lose any data and it becomes immediately available on mobile (HP).
+ */
+export async function migrateLocalDataToFirestoreIfAvailable(
+  firebaseUid: string,
+  userEmail: string
+): Promise<boolean> {
+  if (!isFirebaseConfigured || !db || !userEmail) return false;
+
+  const mockUid = `user-${btoa(userEmail).replace(/=/g, '')}`;
+  const mockUidLower = `user-${btoa(userEmail.toLowerCase()).replace(/=/g, '')}`;
+
+  let walletsStr =
+    localStorage.getItem(`rasio_wallets_${mockUid}`) ||
+    localStorage.getItem(`rasio_wallets_${mockUidLower}`);
+  let catsStr =
+    localStorage.getItem(`rasio_categories_${mockUid}`) ||
+    localStorage.getItem(`rasio_categories_${mockUidLower}`);
+  let txsStr =
+    localStorage.getItem(`rasio_tx_${mockUid}`) ||
+    localStorage.getItem(`rasio_tx_${mockUidLower}`);
+  let ledgerStr =
+    localStorage.getItem(`rasio_budget_ledger_${mockUid}`) ||
+    localStorage.getItem(`rasio_budget_ledger_${mockUidLower}`);
+
+  // Fallback: search any user session key if specific email key not found
+  if (!walletsStr && !catsStr && !txsStr) {
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('rasio_wallets_user-')) {
+          const uId = k.replace('rasio_wallets_', '');
+          walletsStr = localStorage.getItem(`rasio_wallets_${uId}`);
+          catsStr = localStorage.getItem(`rasio_categories_${uId}`);
+          txsStr = localStorage.getItem(`rasio_tx_${uId}`);
+          ledgerStr = localStorage.getItem(`rasio_budget_ledger_${uId}`);
+          if (walletsStr || catsStr || txsStr) break;
+        }
+      }
+    } catch {
+      // Ignore localStorage access errors
+    }
+  }
+
+  if (!walletsStr && !catsStr && !txsStr) {
+    return false;
+  }
+
+  // Check if Firestore already has real transactions or balances
+  const [snapTxs, snapWallets] = await Promise.all([
+    getDocs(collection(db, 'users', firebaseUid, 'transactions')),
+    getDocs(collection(db, 'users', firebaseUid, 'wallets')),
+  ]);
+
+  if (!snapTxs.empty) {
+    return false; // Already has cloud transactions
+  }
+  if (!snapWallets.empty) {
+    const hasBalance = snapWallets.docs.some((d) => (d.data().balance || 0) > 0);
+    if (hasBalance) return false;
+  }
+
+  const localWallets: Wallet[] = walletsStr ? JSON.parse(walletsStr) : [];
+  const localCats: Category[] = catsStr ? JSON.parse(catsStr) : [];
+  const localTxs: Transaction[] = txsStr ? JSON.parse(txsStr) : [];
+  const localLedger: BudgetLedgerEntry[] = ledgerStr ? JSON.parse(ledgerStr) : [];
+
+  const hasRealData =
+    localTxs.length > 0 ||
+    localWallets.some((w) => (w.balance || 0) > 0) ||
+    localCats.some((c) => (c.monthlyPlanCap || 0) > 0);
+
+  if (!hasRealData) return false;
+
+  console.log('Migrating local offline data to Cloud Firestore for user:', userEmail);
+  const batch = writeBatch(db);
+
+  localWallets.forEach((w) => {
+    batch.set(doc(db, 'users', firebaseUid, 'wallets', w.id), w);
+  });
+
+  localCats.forEach((c) => {
+    batch.set(doc(db, 'users', firebaseUid, 'budgets', c.id), c);
+  });
+
+  localTxs.forEach((t) => {
+    batch.set(doc(db, 'users', firebaseUid, 'transactions', t.id), t);
+  });
+
+  localLedger.forEach((l) => {
+    batch.set(doc(db, 'users', firebaseUid, 'budget_ledger', l.id), l);
+  });
+
+  await batch.commit();
+  return true;
+}
+
+/**
  * AUTO-ONBOARDING SEED:
  * Initializes empty zero-slate accounts and categories for regular users,
  * or full demo accounts specifically for demo.user@rasio.id.
@@ -505,6 +607,18 @@ export async function initializeUserDataIfEmpty(
   uid: string,
   userEmail?: string | null
 ): Promise<{ walletsInitialized: boolean }> {
+  // If userEmail is provided and Firebase is configured, attempt auto-migration first!
+  if (isFirebaseConfigured && db && userEmail) {
+    try {
+      const didMigrate = await migrateLocalDataToFirestoreIfAvailable(uid, userEmail);
+      if (didMigrate) {
+        return { walletsInitialized: true };
+      }
+    } catch (e) {
+      console.warn('Auto-migration error:', e);
+    }
+  }
+
   const isDemo = userEmail === 'demo.user@rasio.id';
 
   const walletsToSeed = isDemo ? DEFAULT_WALLETS : CLEAN_DEFAULT_WALLETS;
@@ -601,3 +715,101 @@ export async function resetUserDataToZero(uid: string): Promise<void> {
     localStorage.setItem(`rasio_budget_ledger_${uid}`, JSON.stringify([]));
   }
 }
+
+/**
+ * EXPORT ALL DATA TO JSON
+ * Allows the user to save a complete offline backup file of all their data.
+ */
+export async function exportAllUserDataJSON(
+  uid: string,
+  userEmail?: string | null
+): Promise<string> {
+  const [wallets, categories, transactions, budgetLedger] = await Promise.all([
+    fetchWallets(uid),
+    fetchCategories(uid),
+    fetchTransactions(uid),
+    fetchBudgetLedger(uid),
+  ]);
+
+  const exportData = {
+    app: 'Rasio FinFlow',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    userEmail: userEmail || null,
+    wallets,
+    categories,
+    transactions,
+    budgetLedger,
+  };
+
+  return JSON.stringify(exportData, null, 2);
+}
+
+/**
+ * IMPORT ALL DATA FROM JSON
+ * Restores a full backup from a JSON file into either Firestore or localStorage.
+ */
+export async function importAllUserDataJSON(
+  uid: string,
+  jsonString: string
+): Promise<{
+  success: boolean;
+  error?: string;
+  stats?: { wallets: number; categories: number; transactions: number };
+}> {
+  try {
+    const data = JSON.parse(jsonString);
+
+    if (!data || typeof data !== 'object') {
+      return { success: false, error: 'Format data JSON tidak valid.' };
+    }
+
+    const wallets = Array.isArray(data.wallets) ? data.wallets : [];
+    const categories = Array.isArray(data.categories) ? data.categories : [];
+    const transactions = Array.isArray(data.transactions) ? data.transactions : [];
+    const budgetLedger = Array.isArray(data.budgetLedger) ? data.budgetLedger : [];
+
+    if (wallets.length === 0 && categories.length === 0 && transactions.length === 0) {
+      return { success: false, error: 'File cadangan tidak berisi data dompet atau transaksi.' };
+    }
+
+    if (isFirebaseConfigured && db) {
+      const batch = writeBatch(db);
+
+      wallets.forEach((w: any) => {
+        batch.set(doc(db, 'users', uid, 'wallets', w.id), w);
+      });
+
+      categories.forEach((c: any) => {
+        batch.set(doc(db, 'users', uid, 'budgets', c.id), c);
+      });
+
+      transactions.forEach((t: any) => {
+        batch.set(doc(db, 'users', uid, 'transactions', t.id), t);
+      });
+
+      budgetLedger.forEach((l: any) => {
+        batch.set(doc(db, 'users', uid, 'budget_ledger', l.id), l);
+      });
+
+      await batch.commit();
+    } else {
+      localStorage.setItem(`rasio_wallets_${uid}`, JSON.stringify(wallets));
+      localStorage.setItem(`rasio_categories_${uid}`, JSON.stringify(categories));
+      localStorage.setItem(`rasio_tx_${uid}`, JSON.stringify(transactions));
+      localStorage.setItem(`rasio_budget_ledger_${uid}`, JSON.stringify(budgetLedger));
+    }
+
+    return {
+      success: true,
+      stats: {
+        wallets: wallets.length,
+        categories: categories.length,
+        transactions: transactions.length,
+      },
+    };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message || 'Gagal memproses file JSON.' };
+  }
+}
+

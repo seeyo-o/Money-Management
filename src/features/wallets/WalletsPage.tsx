@@ -15,11 +15,13 @@ import {
   Vault,
   RotateCcw,
   AlertTriangle,
+  Cloud,
 } from 'lucide-react';
 import { useFinance } from '../../context/FinanceContext';
 import type { Wallet, WalletCategory } from '../../domain/types';
 import { formatIDR } from '../../domain/formatters';
 import { SmartCurrencyInput } from '../../components/ui/SmartCurrencyInput';
+import { CloudSyncModal } from '../../components/ui/CloudSyncModal';
 
 export const WalletsPage: React.FC = () => {
   const {
@@ -32,6 +34,7 @@ export const WalletsPage: React.FC = () => {
     resetAllDataToZero,
   } = useFinance();
 
+  const [isCloudSyncOpen, setIsCloudSyncOpen] = useState(false);
   const [reconcilingWallet, setReconcilingWallet] = useState<Wallet | null>(null);
   const [actualBalance, setActualBalance] = useState<number>(0);
   const [reconcileNote, setReconcileNote] = useState<string>('');
@@ -225,7 +228,17 @@ export const WalletsPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={() => setIsCloudSyncOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold shadow-subtle transition"
+            title="Sinkronisasi Cloud & Cadangan JSON"
+          >
+            <Cloud size={14} className="text-teal-700" />
+            <span>Sinkronisasi / Cadangan</span>
+          </button>
+
           <button
             onClick={() => setIsResetConfirmOpen(true)}
             className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-rose-50 text-slate-600 hover:text-rose-700 border border-slate-200 hover:border-rose-200 rounded-xl text-xs font-semibold shadow-subtle transition"
@@ -611,6 +624,12 @@ export const WalletsPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Cloud Sync & Backup Modal */}
+      <CloudSyncModal
+        isOpen={isCloudSyncOpen}
+        onClose={() => setIsCloudSyncOpen(false)}
+      />
     </div>
   );
 };
